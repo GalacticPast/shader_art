@@ -1,0 +1,10 @@
+// TODO: 
+[ ] UI elements that I want to build 
+    [X] Buttons 
+    [X] Checkboxes
+    [X] Radio Buttons 
+    [X] Sliders 
+    [X] think about the layout more seriously, refactor the current code we have 
+    [ ] Text Fields 
+    [ ] Scroll Bars 
+
