@@ -51,8 +51,7 @@ float Rect(vec2 uv, float left, float right, float top, float bottom, float blur
 {
     float band_1 = Band(uv.x, left, right, blur);
     float band_2 = Band(uv.y, bottom, top, blur);
-
-    return band_1 * band_2;
+return band_1 * band_2;
 }
 
 void main() 
@@ -70,13 +69,18 @@ void main()
     float m = 0.2 * sin(u_time + (x * amplitude));
     float y = uv.y - m;
     
-//float Donut(vec2 uv, vec2 pos, float radius,  float width, float blur){
+    float c_pos_x = cos(u_time) * 0.2;
+    float c_pos_y = sin(u_time) * 0.2;
+    float point = Circle(vec2(c_pos_x,c_pos_y),uv,0.01,0.002);
+
     float donut = Donut(uv, vec2(0), 0.2,0.005, 0.002);
-    float rect = Rect(vec2(x,y), -(aspect_ratio / 2),(aspect_ratio / 2) , 0.004, -0.004, 0.005);
+    float rect = Rect(vec2(x,y), -(aspect_ratio / 2),point, 0.004, -0.004, 0.005);
     
+
+
     vec3 color = vec3(0,0,1) * rect;
     color += donut * vec3(0,1,0); 
-    
+    color += point * vec3(1,1,1); 
 
     fragColor = vec4(color, 1);
 }
