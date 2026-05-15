@@ -17,6 +17,13 @@ float Circle(vec2 uv, vec2 pos, float radius,float blur)
     return c_step;
 }
 
+float Donut(vec2 uv, vec2 pos, float radius,  float width, float blur){
+    float inner_circle = Circle(uv, pos, radius, blur);        
+    float outer_circle = Circle(uv, pos, radius + width, blur);        
+
+    return outer_circle - inner_circle;
+}
+
 float Smiley(vec2 uv, vec2 pos, vec2 size)
 {
     uv -= pos; 
@@ -58,11 +65,19 @@ void main()
     uv -= 0.5; 
     uv.x *= aspect_ratio; // 1 unit of X == 1 Unit of y
     
-    uv.x *= sin(u_time);
-    float rect = Rect(uv, -0.3, 0.3, 0.1, -0.1, 0.005);
+    float x = uv.x;
+    float amplitude = 10;
+    float m = 0.2 * sin(u_time + (x * amplitude));
+    float y = uv.y - m;
+    
+//float Donut(vec2 uv, vec2 pos, float radius,  float width, float blur){
+    float donut = Donut(uv, vec2(0), 0.2,0.005, 0.002);
+    float rect = Rect(vec2(x,y), -(aspect_ratio / 2),(aspect_ratio / 2) , 0.004, -0.004, 0.005);
+    
+    vec3 color = vec3(0,0,1) * rect;
+    color += donut * vec3(0,1,0); 
+    
 
-    vec3 color = vec3(1,1,1) * rect;
-
-    fragColor = vec4(color, 1.0);
+    fragColor = vec4(color, 1);
 }
 
