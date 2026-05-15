@@ -47,12 +47,14 @@ float Band(float t, float start, float end, float blur)
     return band_a - band_b;
 }
 
-float Rect(vec2 uv, float left, float right, float top, float bottom, float blur)
+float Rect(vec2 uv, vec2 pos, float left, float right, float top, float bottom, float blur)
 {
+    uv -= pos;
     float band_1 = Band(uv.x, left, right, blur);
     float band_2 = Band(uv.y, bottom, top, blur);
 return band_1 * band_2;
 }
+#define PI 3.14159
 
 void main() 
 {
@@ -64,22 +66,47 @@ void main()
     uv -= 0.5; 
     uv.x *= aspect_ratio; // 1 unit of X == 1 Unit of y
     
+    
     float x = uv.x;
     float amplitude = 10;
     float m = 0.2 * sin(u_time + (x * amplitude));
     float y = uv.y - m;
+
+    float donut_radius = 0.2;
+    float donut = Donut(uv, vec2(0), donut_radius,0.005, 0.002);
     
-    float c_pos_x = cos(u_time) * 0.2;
-    float c_pos_y = sin(u_time) * 0.2;
+    float delta = 1;
+    float t = 0.25;
+    float c_pos_x = cos(3.14159 * t * delta) * donut_radius;
+    float c_pos_y = sin(3.14159 * t * delta) * donut_radius;
     float point = Circle(vec2(c_pos_x,c_pos_y),uv,0.01,0.002);
 
-    float donut = Donut(uv, vec2(0), 0.2,0.005, 0.002);
-    float rect = Rect(vec2(x,y), -(aspect_ratio / 2),point, 0.004, -0.004, 0.005);
+    float left_x = c_pos_x;
+    float right_x = c_pos_x;
+    if(c_pos_x > 0) left_x = 0;
+    else right_x = 0;
+
+    float left_y = c_pos_y;
+    float right_y = c_pos_y;
+    if(c_pos_y > 0) left_y = 0;
+    else right_y = 0;
+
+    float cos_point =  Rect(uv, vec2(0),left_x,right_x, 0.004, -0.004, 0.005);
+    float sin_point =  Rect(vec2(uv.y, uv.x),vec2(0, c_pos_x),left_y,right_y, 0.004, -0.004, 0.005); // reflecting so that it will become flipped
     
+    left_x = donut_radius;
+    right_x = donut_radius;
+    if(c_pos_x > 0) left_x = 0;
+    else right_x = 0;
 
+    float hyp_point =  0; 
+     
 
-    vec3 color = vec3(0,0,1) * rect;
-    color += donut * vec3(0,1,0); 
+    vec3 color = vec3(0,0,0);
+    color += hyp_point * vec3(1,1,1);
+    color += sin_point * vec3(0,1,0); 
+    color += cos_point * vec3(1,0,1); 
+    color += donut * vec3(1,1,0.8); 
     color += point * vec3(1,1,1); 
 
     fragColor = vec4(color, 1);
