@@ -56,6 +56,15 @@ return band_1 * band_2;
 }
 #define PI 3.14159
 
+
+float Line_segment(vec2 uv, vec2 A, vec2 B){
+
+    float h = clamp(dot(uv, B) / dot(B, B), 0.0, 1.0);
+    float dist = length(uv - B * h);
+    
+    return smoothstep(0.01, 0, dist);
+}
+
 void main() 
 {
 
@@ -75,35 +84,24 @@ void main()
     float donut_radius = 0.2;
     float donut = Donut(uv, vec2(0), donut_radius,0.005, 0.002);
     
-    float delta = 1;
-    float t = 0.25;
+    float delta = 0.25;
+    float t = u_time;
     float c_pos_x = cos(3.14159 * t * delta) * donut_radius;
     float c_pos_y = sin(3.14159 * t * delta) * donut_radius;
     float point = Circle(vec2(c_pos_x,c_pos_y),uv,0.01,0.002);
 
     float left_x = c_pos_x;
     float right_x = c_pos_x;
-    if(c_pos_x > 0) left_x = 0;
-    else right_x = 0;
-
     float left_y = c_pos_y;
     float right_y = c_pos_y;
-    if(c_pos_y > 0) left_y = 0;
-    else right_y = 0;
 
-    float cos_point =  Rect(uv, vec2(0),left_x,right_x, 0.004, -0.004, 0.005);
-    float sin_point =  Rect(vec2(uv.y, uv.x),vec2(0, c_pos_x),left_y,right_y, 0.004, -0.004, 0.005); // reflecting so that it will become flipped
-    
-    left_x = donut_radius;
-    right_x = donut_radius;
-    if(c_pos_x > 0) left_x = 0;
-    else right_x = 0;
-
-    float hyp_point =  0; 
+    float cos_point =  Rect(uv, vec2(0),min(left_x, 0), max(right_x,0), 0.004, -0.004, 0.005);
+    float sin_point =  Rect(vec2(uv.y, uv.x),vec2(0, c_pos_x),min(left_y, 0),max(right_y,0), 0.004, -0.004, 0.005); // reflecting so that it will become flipped
+    float hyp_point =  Line_segment(uv, vec2(0),vec2(c_pos_x, c_pos_y)); 
      
 
     vec3 color = vec3(0,0,0);
-    color += hyp_point * vec3(1,1,1);
+    color += hyp_point * vec3(0,1,1);
     color += sin_point * vec3(0,1,0); 
     color += cos_point * vec3(1,0,1); 
     color += donut * vec3(1,1,0.8); 
