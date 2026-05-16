@@ -65,22 +65,6 @@ float Line_segment(vec2 uv, vec2 A, vec2 B){
     return smoothstep(0.01, 0, dist);
 }
 
-// I still need to understand this. 
-vec3 Color_palette(float x)
-{
-    vec3 A = vec3(1);
-    vec3 B = vec3(1);
-    vec3 C = vec3(0.1);
-    vec3 D = vec3(1,0.2,0);
-    vec3 color = A + B * cos(2 * PI * ((C * x) + D));
-    return color;
-}
-
-float Sawtooth(float x){
-    float y = 2.0 * fract(x * 0.2) - 1.0;
-    return y;
-}
-
 void main() 
 {
 
@@ -92,12 +76,48 @@ void main()
     uv.x *= aspect_ratio; // 1 unit of X == 1 Unit of y
     
     
-    float radius = clamp(0,0.5,cos(2 * PI * u_time));
-    float d = Donut(uv, vec2(0), radius, 0.03, 0.03);
-    float glow = Donut(uv, vec2(0), radius, 0.06, 0.06);
+
+    float donut_radius = 0.2;
+    float donut = Donut(uv, vec2(0), donut_radius,0.005, 0.002);
     
-    vec3 color = d * vec3(1,1,1);
-    color += glow * vec3(1,0,0);
+    float delta = 0.25;
+    float t = u_time;
+    float c_pos_x = cos(3.14159 * t * delta) * donut_radius;
+    float c_pos_y = sin(3.14159 * t * delta) * donut_radius;
+    float point = Circle(vec2(c_pos_x,c_pos_y),uv,0.01,0.002);
+
+    float left_x = c_pos_x;
+    float right_x = c_pos_x;
+    float left_y = c_pos_y;
+    float right_y = c_pos_y;
+
+    float adj =  Rect(uv, vec2(0),min(left_x, 0), max(right_x,0), 0.004, -0.004, 0.005);
+    float opp =  Rect(vec2(uv.y, uv.x),vec2(0, c_pos_x),min(left_y, 0),max(right_y,0), 0.004, -0.004, 0.005); // reflecting so that it will become flipped
+    float hyp_point =  Line_segment(uv, vec2(0),vec2(c_pos_x, c_pos_y)); 
+
+//float Rect(vec2 uv, vec2 pos, float left, float right, float top, float bottom, float blur)
+    float x = uv.x;
+    float amplitude = 10;
+    float m = 0.2 * cos(u_time + (x * amplitude));
+    float y = uv.y - m;
+    float cos_wave =  Rect(vec2(x,y), vec2(0),-0.5, 0.5, 0.004, -0.004, 0.005);
+
+    x = uv.x;
+    amplitude = 10;
+    m = 0.2 * sin(u_time + (x * amplitude));
+    y = uv.y - m;
+    float sin_wave =  Rect(vec2(x,y),vec2(0),-0.5, 0.5, 0.004, -0.004, 0.005); // reflecting so that it will become flipped
+        
+
+
+    vec3 color = vec3(0,0,0);
+    color += hyp_point * vec3(0,1,1);
+    color += opp * vec3(0,1,0); 
+    color += adj * vec3(1,0,1); 
+    color += donut * vec3(1,1,0.8); 
+    color += point * vec3(1,1,1); 
+    color += cos_wave * vec3(1,0,1); 
+    color += sin_wave * vec3(1,1,0); 
 
     fragColor = vec4(color, 1);
 }
