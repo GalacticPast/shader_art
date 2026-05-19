@@ -28,13 +28,16 @@ int main()
         long currentModTime = GetFileModTime("../src/fragment.glsl");
         if (currentModTime > lastModTime)
         {
-            shader        = LoadShader(0, "../src/fragment.glsl");
+            Shader temp = LoadShader(0, "../src/fragment.glsl");
+            if (IsShaderValid(temp))
+            {
+                shader = temp;
+            }
             lastModTime   = currentModTime;
             width         = GetScreenWidth();
             height        = GetRenderHeight();
             resolution[0] = width;
             resolution[1] = height;
-            printf("width :%d, height: %d\n", width, height);
         }
 
         // 2. Get the current time in seconds since the window opened

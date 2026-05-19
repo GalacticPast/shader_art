@@ -36,7 +36,6 @@ float Smiley(vec2 uv, vec2 pos, vec2 size)
     float mouth_l = Circle(uv, vec2(0,-0.065), 0.08,0.01);
      
     float mask = face - l_eye - r_eye - (mouth_u - mouth_l);
-
     return mask;
 }
 
@@ -66,39 +65,49 @@ float Line_segment(vec2 uv, vec2 A, vec2 B){
 }
 
 // I still need to understand this. 
-vec3 Color_palette(float x)
-{
-    vec3 A = vec3(1);
-    vec3 B = vec3(1);
-    vec3 C = vec3(0.1);
-    vec3 D = vec3(1,0.2,0);
-    vec3 color = A + B * cos(2 * PI * ((C * x) + D));
-    return color;
+vec3 Color_palette( float t ) {
+    vec3 a = vec3(0.5, 0.5, 0.5);
+    vec3 b = vec3(0.5, 0.5, 0.5);
+    vec3 c = vec3(1.0, 1.0, 1.0);
+    vec3 d = vec3(0.263,0.416,0.557);
+
+    return a + b*cos( 6.28318*(c*t+d) );
 }
+// vec3 Color_palette(float x)
+// {
+//     vec3 A = vec3(1);
+//     vec3 B = vec3(1);
+//     vec3 C = vec3(0.1);
+//     vec3 D = vec3(1,0.2,0);
+//     vec3 color = A + B * cos(2 * PI * ((C * x) + D));
+//     return color;
+// }
 
 float Sawtooth(float x){
     float y = 2.0 * fract(x * 0.2) - 1.0;
     return y;
 }
-
+#define PI 3.14159
 void main() 
 {
-
     vec2 frag_coord = vec2(gl_FragCoord.x, gl_FragCoord.y);
     float aspect_ratio = u_resolution.x / u_resolution.y;
 
     vec2 uv = frag_coord / u_resolution;  
     uv -= 0.5; 
     uv.x *= aspect_ratio; // 1 unit of X == 1 Unit of y
-    
-    
-    float radius = clamp(0,0.5,cos(2 * PI * u_time));
-    float d = Donut(uv, vec2(0), radius, 0.03, 0.03);
-    float glow = Donut(uv, vec2(0), radius, 0.06, 0.06);
-    
-    vec3 color = d * vec3(1,1,1);
-    color += glow * vec3(1,0,0);
+    vec3 final_color = vec3(0);
+    vec2 uv0 = uv;
 
-    fragColor = vec4(color, 1);
+    for(float i = 0.0 ; i < 2.0 ; i++)
+    {
+        uv0 = fract(uv0 * 2.0) -0.5;
+        vec3 color  = Color_palette(length(uv) + u_time);
+        float r1 = sin(20 * length(uv0) + u_time);
+
+        float d = Donut(uv0, vec2(0), r1, 0.4,0.1);
+        final_color += color * d;
+    }
+    fragColor = vec4(final_color, 1);
 }
 
