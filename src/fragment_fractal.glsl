@@ -87,20 +87,6 @@ float Sawtooth(float x){
     float y = 2.0 * fract(x * 0.2) - 1.0;
     return y;
 }
-
-float Sd_sphere(vec3 p, float r){
-    return length(p) - r; // return a sphere centered on the origin with radius of 1. 
-}
-
-
-float Map(vec3 p){
-    //vec3 sphere_pos = vec3(1.6 * sin(3 * u_time),0,1);
-    float sphere = Sd_sphere(p, 1);
-    float plane = p.y + 0.25;
-     
-    return min(sphere, plane);
-}
-
 #define PI 3.14159
 void main() 
 {
@@ -110,21 +96,18 @@ void main()
     vec2 uv = frag_coord / u_resolution;  
     uv -= 0.5; 
     uv.x *= aspect_ratio; // 1 unit of X == 1 Unit of y
-    
-    vec3 rO = vec3(0,0,-3);
-    vec3 rD = normalize(vec3(uv, 1.0)); 
-    
-    float t = 0.0;
-    vec3 col = vec3(0);
-    for(int i = 0 ; i < 100 ; i++){
-         vec3 p = rO + rD * t; 
-         float d = Map(p);
+    vec3 final_color = vec3(0);
+    vec2 uv0 = uv;
 
-         t += d;
-         if (d < 0.001 || d > 100.0) break;
+    for(float i = 0.0 ; i < 2.0 ; i++)
+    {
+        uv0 = fract(uv0 * 2.0) -0.5;
+        vec3 color  = Color_palette(length(uv) + u_time);
+        float r1 = sin(20 * length(uv0) + u_time);
+
+        float d = Donut(uv0, vec2(0), r1, 0.4,0.1);
+        final_color += color * d;
     }
-    col = vec3(t * 0.1);
-
-    fragColor = vec4(col, 1);
+    fragColor = vec4(final_color, 1);
 }
 

@@ -6,8 +6,8 @@
 
 int main()
 {
-    SetConfigFlags(FLAG_BORDERLESS_WINDOWED_MODE | FLAG_WINDOW_RESIZABLE); // Setup init configuration flags (view FLAGS)
-    InitWindow(0, 0, "Raymarching Shader");
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE); // Setup init configuration flags (view FLAGS)
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Raymarching Shader");
     SetTargetFPS(60);
 
     Shader shader = LoadShader(0, "../src/fragment.glsl");
