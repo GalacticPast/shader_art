@@ -117,17 +117,7 @@ float Map(vec3 p){
 
     float angle = PI / 2; 
 
-    vec3 line_pos_a = vec3(0.0, 0.0,0.0);
-    vec3 line_pos_b = vec3(1.0, 1.0,0.0);
-    vec3 line_dir = line_pos_b - line_pos_a;
-    line_pos_b *= 0.2; // scale
-    line_pos_a.xy += 1; // translation
-    line_pos_b.xy += 1; // translation 
-
-    float line = Sd_capsule(p, line_pos_a,line_pos_b,0.01);
-
     float map = min(sphere, plane);
-    map = min(map, line);
     
     return map;
 }
@@ -142,40 +132,39 @@ vec3 Get_normal(vec3 p) {
     return normalize(vec3(dx, dy, dz));
 }
 
-vec3 Raymarch(vec3 rO, vec3 rD){
+float Get_light(vec3 p, vec3 cam_pos){
+    vec3 light_pos = vec3(cos(u_time),3,sin(u_time));
+
+    vec3 N = Get_normal(p);
+    vec3 light_vector = normalize(light_pos - p); 
+
+    vec3 ref_light_vector = reflect(light_vector, N);  // perfect specualr
+    vec3 cam_dir = p - cam_pos;  // our cam dir
+     
+    float specular = clamp(dot(ref_light_vector, cam_dir), 0.0, 1.0);
+    specular = 0.02 * pow(specular,200);
+    float diff = clamp(dot(light_vector, N), 0.0, 1.0);
+    diff += specular;
+    return diff; 
+}
+
+
+float Raymarch(vec3 rO, vec3 rD){
     float t = 0.0;
-    vec3 col = vec3(0);
     bool hit = false;
+
     for(int i = 0 ; i < 100 ; i++){
          vec3 p = rO + rD * t; 
          float d = Map(p);
 
          t += d;
          if (d < 0.001) {
-              vec3 N = Get_normal(p);
-             
-              // 2. Define a light position (e.g., floating above and to the left)
-              vec3 lightPos = vec3(2.0, 5.0, 1.0);
-             
-              // 3. Calculate the light direction vector (Target - Source) and normalize it
-              vec3 L = normalize(lightPos - p);
-             
-              // 4. Calculate diffuse intensity using the dot product
-              float diffuse = max(dot(N, L), 0.0);
-             
-              // 5. Combine with a base color and a tiny bit of ambient light so shadows aren't pitch black
-              vec3 objectColor = vec3(0.0, 0.0, 1.0); // A nice blue sphere
-              vec3 ambient = vec3(0.1);               // Soft background light
-             
-             col = objectColor * (diffuse + ambient);
-
              break;
          } else if(d > 100.0){
              break;
          }
     }
-    //col = vec3(t * 0.1);
-    return col;
+    return t;
 }
 
 #define PI 3.14159
@@ -190,10 +179,14 @@ void main()
     
     vec3 rO = vec3(0,0,-3);
     vec3 rD = normalize(vec3(uv, 1.0)); 
+    
+    float d = Raymarch(rO,rD);
 
-    vec3 col = Raymarch(rO, rD);
+    vec3 intersect_p = rO + rD * d;
+    float l = Get_light(intersect_p, rO);
+        
+    vec3 col = l * vec3(1);
      
-
     fragColor = vec4(col, 1);
 }
 
