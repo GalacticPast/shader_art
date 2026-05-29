@@ -1,4 +1,3 @@
-
 #version 330
 
 
@@ -25,6 +24,21 @@ float Donut(vec2 uv, vec2 pos, float radius,  float width, float blur){
     return outer_circle - inner_circle;
 }
 
+float Glow(vec2 uv, vec2 p){
+    float dist = length(p - uv);
+    float glow = 0.05 / dist; 
+    return glow;
+}
+
+vec3 Color_palette( float t ) {
+    vec3 a = vec3(0.5, 0.5, 0.5);
+    vec3 b = vec3(0.5, 0.5, 0.5);
+    vec3 c = vec3(1.0, 1.0, 1.0);
+    vec3 d = vec3(0.263,0.416,0.557);
+
+    return a + b*cos( 6.28318*(c*t+d) );
+}
+
 void main() 
 {
     vec2 frag_coord = vec2(gl_FragCoord.x, gl_FragCoord.y);
@@ -32,10 +46,22 @@ void main()
     vec2 uv = frag_coord / u_resolution;  
     uv -= 0.5; 
     uv.x *= aspect_ratio;
+    
+    float radius = 0.2;
+    
+    vec3 color = vec3(0);
 
-    float c = Donut(uv, vec2(0), 0.4,0.01, 0.005);
+    for(int i = 1 ; i <= 30 ; i++){
+        vec2 pos = vec2(radius * cos(u_time / i), radius * sin(u_time / i));
+        float dist = 0.02 / length(uv - pos); 
+        dist *= 0.1;
+        dist = pow(dist , 0.8);
+        color += dist * vec3(1.0, 0.5, 0.25);
 
-    fragColor = vec4(vec3(c), 1);
+    }
 
+    color = tanh(color); 
+
+    fragColor = vec4(color, 1);
 }
 
