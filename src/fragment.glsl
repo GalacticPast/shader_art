@@ -24,44 +24,51 @@ float Donut(vec2 uv, vec2 pos, float radius,  float width, float blur){
     return outer_circle - inner_circle;
 }
 
-float Glow(vec2 uv, vec2 p){
-    float dist = length(p - uv);
-    float glow = 0.05 / dist; 
-    return glow;
+float dot2(vec2 p){
+    return dot(p,p);
 }
 
-vec3 Color_palette( float t ) {
-    vec3 a = vec3(0.5, 0.5, 0.5);
-    vec3 b = vec3(0.5, 0.5, 0.5);
-    vec3 c = vec3(1.0, 1.0, 1.0);
-    vec3 d = vec3(0.263,0.416,0.557);
+float Sd_heart( in vec2 p )
+{
+    p.x = abs(p.x);
 
-    return a + b*cos( 6.28318*(c*t+d) );
+    if( p.y+p.x>1.0 )
+        return sqrt(dot2(p-vec2(0.25,0.75))) - sqrt(2.0)/4.0;
+    return sqrt(min(dot2(p-vec2(0.00,1.00)),
+                    dot2(p-0.5*max(p.x+p.y,0.0)))) * sign(p.x-p.y);
 }
 
 void main() 
 {
     vec2 frag_coord = vec2(gl_FragCoord.x, gl_FragCoord.y);
-    float aspect_ratio = u_resolution.x / u_resolution.y;
-    vec2 uv = frag_coord / u_resolution;  
-    uv -= 0.5; 
-    uv.x *= aspect_ratio;
+
+    vec2 uv =  (frag_coord * 2) / u_resolution ;
+    uv -= 1;
+    uv.x *= u_resolution.x / u_resolution.y; 
+
+    // 2. THE SHAPE: A basic circle
+    // length(p) is distance from center. Subtracting 0.5 makes a circle of radius 0.5.
+    float dist = Sd_heart(uv - vec2(0, -0.5));
     
-    float radius = 0.2;
+    // Taking the absolute value turns a solid circle into an outline (a ring)
+    float heart = abs(dist);
+
+    // 3. THE LIGHT: A single, stationary spotlight
+    // This vector points to the top-right. 
+    vec2 lightDirection = normalize(vec2(sin(u_time),cos(u_time))); 
     
-    vec3 color = vec3(0);
+    // The dot product calculates how much each pixel's position aligns with the light
+    float spotlight = dot(uv, lightDirection); 
 
-    for(int i = 1 ; i <= 30 ; i++){
-        vec2 pos = vec2(radius * cos(u_time / i), radius * sin(u_time / i));
-        float dist = 0.02 / length(uv - pos); 
-        dist *= 0.1;
-        dist = pow(dist , 0.8);
-        color += dist * vec3(1.0, 0.5, 0.25);
+    // 4. THE COLOR & GLOW
+    vec3 baseColor = vec3(0.2, 0.8, 1.0); // A nice cyan/blue
+    
+    // Here is the magic formula broken down:
+    // (0.05 / heart) creates the glow. As 'heart' gets closer to 0, the brightness shoots up.
+    // (spotlight + 0.5) applies the light. The +0.5 ensures the dark side isn't pitch black.
+    vec3 finalColor = baseColor * (spotlight + 0.8) * (0.02 / heart);
 
-    }
-
-    color = tanh(color); 
-
-    fragColor = vec4(color, 1);
+    // Output to the screen!
+    fragColor = vec4(finalColor, 1.0);
 }
 
