@@ -8,21 +8,7 @@ uniform sampler2D u_main;
 
 out vec4 fragColor;
 
-float Circle(vec2 uv, vec2 pos, float radius,float blur)
-{
-    uv -= pos;
-    float dist = length(uv); // magnitude of how far it is from the origin 
-    float c_step = smoothstep(radius, radius - blur, dist); 
-         
-    return c_step;
-}
-
-float Donut(vec2 uv, vec2 pos, float radius,  float width, float blur){
-    float inner_circle = Circle(uv, pos, radius, blur);        
-    float outer_circle = Circle(uv, pos, radius + width, blur);        
-
-    return outer_circle - inner_circle;
-}
+// thank you iq: https://www.shadertoy.com/view/3tyBzV
 
 float dot2(vec2 p){
     return dot(p,p);
@@ -45,6 +31,8 @@ void main()
     vec2 uv =  (frag_coord * 2) / u_resolution ;
     uv -= 1;
     uv.x *= u_resolution.x / u_resolution.y; 
+    
+    uv *= sin(2 * 3.1459 * u_time + uv.y/2) * 0.5 + 1.0;
 
     float dist = Sd_heart(uv - vec2(0, -0.5));
     float heart = abs(dist);
@@ -53,11 +41,10 @@ void main()
     
     float spotlight = dot(uv, lightDirection); 
 
-    vec3 baseColor = vec3(0.8, 0.1, 0.2); // A nice cyan/blue
+    vec3 baseColor = vec3(0.8, 0.1, 0.2); 
     
     vec3 finalColor = baseColor * (spotlight + 1.0) * (0.09 / heart);
 
-    // Output to the screen!
     fragColor = vec4(finalColor, 1.0);
 }
 
