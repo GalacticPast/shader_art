@@ -46,27 +46,16 @@ void main()
     uv -= 1;
     uv.x *= u_resolution.x / u_resolution.y; 
 
-    // 2. THE SHAPE: A basic circle
-    // length(p) is distance from center. Subtracting 0.5 makes a circle of radius 0.5.
     float dist = Sd_heart(uv - vec2(0, -0.5));
-    
-    // Taking the absolute value turns a solid circle into an outline (a ring)
     float heart = abs(dist);
 
-    // 3. THE LIGHT: A single, stationary spotlight
-    // This vector points to the top-right. 
     vec2 lightDirection = normalize(vec2(sin(u_time),cos(u_time))); 
     
-    // The dot product calculates how much each pixel's position aligns with the light
     float spotlight = dot(uv, lightDirection); 
 
-    // 4. THE COLOR & GLOW
-    vec3 baseColor = vec3(0.2, 0.8, 1.0); // A nice cyan/blue
+    vec3 baseColor = vec3(0.8, 0.1, 0.2); // A nice cyan/blue
     
-    // Here is the magic formula broken down:
-    // (0.05 / heart) creates the glow. As 'heart' gets closer to 0, the brightness shoots up.
-    // (spotlight + 0.5) applies the light. The +0.5 ensures the dark side isn't pitch black.
-    vec3 finalColor = baseColor * (spotlight + 0.8) * (0.02 / heart);
+    vec3 finalColor = baseColor * (spotlight + 1.0) * (0.09 / heart);
 
     // Output to the screen!
     fragColor = vec4(finalColor, 1.0);
