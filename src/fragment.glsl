@@ -12,6 +12,17 @@ out vec4 fragColor;
 #define MIN_DIST 0.0
 #define EPS 0.001
 #define GRID_SIZE 3.0
+#define PI 3.1459
+
+float N21(vec2 p){
+    p = fract(p * vec2(289.31231, 381.12312));
+    p += dot(p, p+20.3124);
+    return fract(p.x * p.y);
+}
+vec2 N22(vec2 p){
+    float n = N21(p);
+    return vec2(n, N21(p + n));
+}
 
 vec3 Inf_rep( vec3 p, vec3 spacing)
 {
@@ -38,7 +49,6 @@ float Sd_capsule(vec3 p, vec3 a, vec3 b, float r)
   return length( pa - ba*h ) - r;
 }
 
-
 vec2 Get_id(vec3 p){
     vec2 id = floor(p.xz / GRID_SIZE);
     return id;
@@ -46,8 +56,9 @@ vec2 Get_id(vec3 p){
 
 vec2 Get_pos(vec2 id)
 {
-   vec2 p = vec2(id.x * GRID_SIZE + GRID_SIZE / 2, id.y * GRID_SIZE + GRID_SIZE / 2); 
-   return p;
+    //vec2 ran = N22(id); 
+    vec2 p = vec2(id.x * GRID_SIZE + GRID_SIZE / 2, id.y * GRID_SIZE + GRID_SIZE / 2); 
+    return p;
 }
 
 float Map(vec3 p) 
@@ -55,7 +66,7 @@ float Map(vec3 p)
 
     vec3 q = p; 
     vec2 id = Get_id(p);
-    float sphere_height = 2.0 + sin(u_time + id.x + id.y); 
+    float sphere_height = 2.0; 
     //float sphere_height = 2.0; 
 
     float min_line = 99999.0;
@@ -65,29 +76,32 @@ float Map(vec3 p)
 
     // float dx[8] = float[8](-1.0, 0.0, 1.0, -1.0, 1.0, -1.0, 0.0, 1.0);
     // float dy[8] = float[8]( 1.0, 1.0, 1.0, 0.0, 0.0, -1.0, -1.0, -1.0);
-    float dx[4] = float[4](0.0, 1.0, 0.0, -1.0);
-    float dy[4] = float[4]( 1.0 , 0.0, -1.0, 0.0);
-    for(int i = 0 ; i < 4 ; i++)
-    {
-        vec2 n_id = vec2(id.x + dx[i], id.y + dy[i]);
-        vec2 n_pos = Get_pos(n_id);  
-        float n_sph_h = 2.0 + sin(u_time + n_id.x + n_id.y); 
-
-        float line = Sd_capsule(p, current_center, vec3(n_pos.x, n_sph_h, n_pos.y),0.2);
-        min_line = min(min_line, line);
-    } 
+    // float dx[4] = float[4](0.0, 1.0, 0.0, -1.0);
+    // float dy[4] = float[4]( 1.0 , 0.0, -1.0, 0.0);
+    // for(int i = 0 ; i < 4 ; i++)
+    // {
+    //     vec2 n_id = vec2(id.x + dx[i], id.y + dy[i]);
+    //     vec2 n_pos = Get_pos(n_id);  
+    //     float n_sph_h = 2.0 + sin(u_time + n_id.x + n_id.y); 
+    //
+    //     float line = Sd_capsule(p, current_center, vec3(n_pos.x, n_sph_h, n_pos.y),0.2);
+    //     min_line = min(min_line, line);
+    // } 
 
     // folded space
+    vec2 rand = (N22(id) - 0.5) * 2.0;
     q.x = mod(p.x, GRID_SIZE) - (GRID_SIZE / 2.0);
-    q.y = p.y - sphere_height;
+    q.x += rand.x;
+    q.y = p.y - (rand.x + rand.y + 1.0);
     q.z = mod(p.z, GRID_SIZE) - (GRID_SIZE / 2.0);
+    q.z += rand.y;
 
-    float sph = Sd_sphere(q, 0.5);  // distortion fix
+    float sph = Sd_sphere(q, 0.5);  
     float plane = p.y;
 
     float d =  min(sph, plane);
     d = min(min_line, d);
-    return d * 0.8; 
+    return d; 
 }
 
 float Raymarch(vec3 ray_origin, vec3 ray_dir) 
@@ -138,7 +152,6 @@ float Get_light(vec3 pos)
 
     return l ;
 }
-#define PI 3.1459
 void main() 
 {
     vec2 frag_coord = vec2(gl_FragCoord.x, gl_FragCoord.y);
@@ -150,7 +163,7 @@ void main()
     vec3 rO = vec3(0.0, 2, -8.0); 
     vec3 rD = normalize(vec3(uv, 1.0));
      
-    float rad = PI / 4;
+    float rad = PI / 2;
     rO.yz *= rot2D(rad); 
     rD.yz *= rot2D(rad);
     rO.xz *= rot2D(rad);
@@ -159,11 +172,20 @@ void main()
     float d = Raymarch(rO, rD); 
     vec3 pos = rO + rD * d;
     
+    float random = N21(uv);
 
     float light = Get_light(pos);
     vec3 f_color = vec3(1) * light; 
     if(d > 45) f_color = vec3(0);
     float grid_size = 3.0;
+
+    if(mod(pos.x, grid_size) > grid_size - 0.1){
+        f_color = vec3(0);
+    } 
+    if(mod(pos.z, grid_size) > grid_size - 0.1){
+        f_color = vec3(0);
+    } 
+     
 
     fragColor = vec4(f_color, 1.0);
 }
