@@ -153,7 +153,6 @@ float Get_light(vec3 p, vec3 cam_pos){
 
 float Raymarch(vec3 rO, vec3 rD){
     float t = 0.0;
-    bool hit = false;
 
     for(int i = 0 ; i < 100 ; i++){
          vec3 p = rO + rD * t; 

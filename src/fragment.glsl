@@ -8,43 +8,131 @@ uniform sampler2D u_main;
 
 out vec4 fragColor;
 
-// thank you iq: https://www.shadertoy.com/view/3tyBzV
+#define MAX_DIST 100.0
+#define MIN_DIST 0.0
+#define EPS 0.001
 
-float dot2(vec2 p){
-    return dot(p,p);
+
+vec3 Inf_rep( vec3 p, vec3 spacing)
+{
+    vec3 q = p - spacing * round(p / spacing);
+    return q;
 }
 
-float Sd_heart( in vec2 p )
+vec3 Lim_rep(vec3 p, float s, vec3 l)
 {
-    p.x = abs(p.x);
+    vec3 q = p - s*clamp(round(p/s),-l,l);
+    return q;
+}
 
-    if( p.y+p.x>1.0 )
-        return sqrt(dot2(p-vec2(0.25,0.75))) - sqrt(2.0)/4.0;
-    return sqrt(min(dot2(p-vec2(0.00,1.00)),
-                    dot2(p-0.5*max(p.x+p.y,0.0)))) * sign(p.x-p.y);
+float Sd_sphere(vec3 p, float r)
+{
+    return length(p) - r;
+}
+
+float Map(vec3 p) 
+{
+    float sph = Sd_sphere(p, 0.5); 
+    
+    float plane = p.y;
+
+    return min(sph, plane); 
+}
+
+float Raymarch(vec3 ray_origin, vec3 ray_dir) 
+{
+    float t = 0.0;
+
+    for(int i = 0; i < 100; i++) {
+        vec3 pos = ray_origin + ray_dir * t;     
+        
+        float d = Map(pos); 
+        t += d;
+
+        if(d < EPS || t > MAX_DIST) {
+            break;
+        }
+    }
+    return t;
+}
+mat2 rot2D(float angle) 
+{
+    float s = sin(angle);
+    float c = cos(angle);
+    return mat2(c, -s, s, c);
+}
+
+vec3 Get_normal(vec3 pos){
+    float h = 0.001;
+    vec2  gradient = vec2(h, 0);
+    
+    float dx = Map(pos + gradient.xyy) - Map(pos - gradient.xyy); // x dist
+    float dy = Map(pos + gradient.yxy) - Map(pos - gradient.yxy); // y dist
+    float dz = Map(pos + gradient.yyx) - Map(pos - gradient.yyx); // z dist
+
+    vec3 normal = normalize(vec3(dx, dy, dz));
+
+    return normal;
+}
+
+float Get_light(vec3 pos)
+{
+    vec3 light_pos = vec3(10, 20, 0);
+    vec3 norm = Get_normal(pos);
+
+    vec3 light_dir = normalize(light_pos - pos); 
+    
+    float l = max(dot(norm, light_dir), 0.0);
+    
+
+    return l ;
 }
 
 void main() 
 {
     vec2 frag_coord = vec2(gl_FragCoord.x, gl_FragCoord.y);
 
-    vec2 uv =  (frag_coord * 2) / u_resolution ;
-    uv -= 1;
+    vec2 uv = (frag_coord * 2)/ u_resolution;
+    uv -= 1.0;
     uv.x *= u_resolution.x / u_resolution.y; 
     
-    uv *= sin(2 * 3.1459 * u_time + uv.y/2) * 0.5 + 1.0;
 
-    float dist = Sd_heart(uv - vec2(0, -0.5));
-    float heart = abs(dist);
-
-    vec2 lightDirection = normalize(vec2(sin(u_time),cos(u_time))); 
+    vec3 rO = vec3(0.0, 0.2, -3.0); 
+    vec3 rD = normalize(vec3(uv, 1.0));
     
-    float spotlight = dot(uv, lightDirection); 
+    float rad = 0.25;
+    rO.yz *= rot2D(rad); 
+    rD.yz *= rot2D(rad);
 
-    vec3 baseColor = vec3(0.8, 0.1, 0.2); 
+    float d = Raymarch(rO, rD); 
+    vec3 pos = rO + rD * d;
+
+    vec2 grid = fract(pos.xz);
+    float lineThickness = 0.05;
+    float gridPattern = step(lineThickness, grid.x) * step(lineThickness, grid.y);
+    vec3 plane_color = mix(vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0), gridPattern);
     
-    vec3 finalColor = baseColor * (spotlight + 1.0) * (0.09 / heart);
+    float light = Get_light(pos);
 
-    fragColor = vec4(finalColor, 1.0);
+    vec3 f_color = vec3(1) * light * plane_color; 
+
+    fragColor = vec4(f_color, 1.0);
 }
+//uv *= 10;
+
+    // vec2 gv = fract(uv);
+    // vec2 grid = step(0.95, gv); 
+    //
+    // vec2 pos = floor(uv) + 0.5;   
+    //
+    //
+    // vec3 color = vec3(0);
+    // color += grid.x * vec3(0.3,0,0.3); 
+    // color += grid.y * vec3(0,0.3,0.3); 
+    //
+    //
+    // float circle = Circle(uv,pos, 0.1);
+    //
+    // float center = Circle(uv, vec2(0), 0.1);
+    //
 
