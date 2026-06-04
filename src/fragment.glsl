@@ -25,14 +25,15 @@ vec3 Lim_rep(vec3 p, float s, vec3 l)
     return q;
 }
 
-float Sd_sphere(vec3 p, float r)
+float Sd_sphere(vec3 uv, vec3 sphere_pos, float r)
 {
-    return length(p) - r;
+    return length(uv - sphere_pos) - r;
 }
 
 float Map(vec3 p) 
 {
-    float sph = Sd_sphere(p, 0.5); 
+    vec3 sphere_pos = vec3(p.x, 0, 0);
+    float sph = Sd_sphere(p,sphere_pos, 0.5); 
     
     float plane = p.y;
 
@@ -107,14 +108,9 @@ void main()
     float d = Raymarch(rO, rD); 
     vec3 pos = rO + rD * d;
 
-    vec2 grid = fract(pos.xz);
-    float lineThickness = 0.05;
-    float gridPattern = step(lineThickness, grid.x) * step(lineThickness, grid.y);
-    vec3 plane_color = mix(vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0), gridPattern);
-    
     float light = Get_light(pos);
 
-    vec3 f_color = vec3(1) * light * plane_color; 
+    vec3 f_color = vec3(1) * light; 
 
     fragColor = vec4(f_color, 1.0);
 }
