@@ -8,203 +8,104 @@ uniform sampler2D u_main;
 
 out vec4 fragColor;
 
-#define MAX_DIST 100.0
-#define MIN_DIST 0.0
-#define EPS 0.001
-#define GRID_SIZE 3.0
-#define PI 3.1459
-
-float N21(vec2 p){
-    p = fract(p * vec2(289.31231, 381.12312));
-    p += dot(p, p+20.3124);
-    return fract(p.x * p.y);
-}
-vec2 N22(vec2 p){
-    float n = N21(p);
-    return vec2(n, N21(p + n));
-}
-
-vec3 Inf_rep( vec3 p, vec3 spacing)
+void main()
 {
-    vec3 q = p - spacing * round(p / spacing);
-    return q;
-}
-
-vec3 Lim_rep(vec3 p, float s, vec3 l)
-{
-    vec3 q = p - s*clamp(round(p/s),-l,l);
-    return q;
-}
-
-float Sd_sphere(vec3 sphere_pos, float r)
-{
-    return length(sphere_pos) - r;
-}
-// p -> pos , a -> begin, b -> end , r -> radius
-// https://iquilezles.org/articles/distfunctions/ Thank you iq!!! Thank you iq!!! Thank you iq!!! :)
-float Sd_capsule(vec3 p, vec3 a, vec3 b, float r) 
-{
-  vec3 pa = p - a, ba = b - a;
-  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-  return length( pa - ba*h ) - r;
-}
-
-vec2 Get_id(vec3 p){
-    vec2 id = floor(p.xz / GRID_SIZE);
-    return id;
-}
-
-vec2 Get_pos(vec2 id)
-{
-    //vec2 ran = N22(id); 
-    vec2 p = vec2(id.x * GRID_SIZE + GRID_SIZE / 2, id.y * GRID_SIZE + GRID_SIZE / 2); 
-    return p;
-}
-
-float Map(vec3 p) 
-{
-
-    vec3 q = p; 
-    vec2 id = Get_id(p);
-    float sphere_height = 2.0; 
-    //float sphere_height = 2.0; 
-
-    float min_line = 99999.0;
-
-    vec2 current_pos_2d = Get_pos(id);
-    vec3 current_center = vec3(current_pos_2d.x, sphere_height, current_pos_2d.y);
-
-    // float dx[8] = float[8](-1.0, 0.0, 1.0, -1.0, 1.0, -1.0, 0.0, 1.0);
-    // float dy[8] = float[8]( 1.0, 1.0, 1.0, 0.0, 0.0, -1.0, -1.0, -1.0);
-    // float dx[4] = float[4](0.0, 1.0, 0.0, -1.0);
-    // float dy[4] = float[4]( 1.0 , 0.0, -1.0, 0.0);
-    // for(int i = 0 ; i < 4 ; i++)
-    // {
-    //     vec2 n_id = vec2(id.x + dx[i], id.y + dy[i]);
-    //     vec2 n_pos = Get_pos(n_id);  
-    //     float n_sph_h = 2.0 + sin(u_time + n_id.x + n_id.y); 
-    //
-    //     float line = Sd_capsule(p, current_center, vec3(n_pos.x, n_sph_h, n_pos.y),0.2);
-    //     min_line = min(min_line, line);
-    // } 
-
-    // folded space
-    vec2 rand = (N22(id) - 0.5) * 2.0;
-    q.x = mod(p.x, GRID_SIZE) - (GRID_SIZE / 2.0);
-    q.x += rand.x;
-    q.y = p.y - (rand.x + rand.y + 1.0);
-    q.z = mod(p.z, GRID_SIZE) - (GRID_SIZE / 2.0);
-    q.z += rand.y;
-
-    float sph = Sd_sphere(q, 0.5);  
-    float plane = p.y;
-
-    float d =  min(sph, plane);
-    d = min(min_line, d);
-    return d; 
-}
-
-float Raymarch(vec3 ray_origin, vec3 ray_dir) 
-{
-    float t = 0.0;
-
-    for(int i = 0; i < MAX_DIST; i++) {
-        vec3 pos = ray_origin + ray_dir * t;     
-        
-        float d = Map(pos); 
-        t += d;
-
-        if(d < EPS || t > MAX_DIST) {
-            break;
-        }
-    }
-    return t;
-}
-mat2 rot2D(float angle) 
-{
-    float s = sin(angle);
-    float c = cos(angle);
-    return mat2(c, -s, s, c);
-}
-
-vec3 Get_normal(vec3 pos){
-    float h = 0.001;
-    vec2  gradient = vec2(h, 0);
-    
-    float dx = Map(pos + gradient.xyy) - Map(pos - gradient.xyy); // x dist
-    float dy = Map(pos + gradient.yxy) - Map(pos - gradient.yxy); // y dist
-    float dz = Map(pos + gradient.yyx) - Map(pos - gradient.yyx); // z dist
-
-    vec3 normal = normalize(vec3(dx, dy, dz));
-
-    return normal;
-}
-
-float Get_light(vec3 pos)
-{
-    vec3 light_pos = vec3(10, 20, 0);
-    vec3 norm = Get_normal(pos);
-
-    vec3 light_dir = normalize(light_pos - pos); 
-    
-    float l = max(dot(norm, light_dir), 0.0);
-    
-
-    return l ;
-}
-void main() 
-{
+    vec2 res = u_resolution.xy;
+    //remap the UV coordinates to go from -1 to +1 vertically, square aspect ratio
     vec2 frag_coord = vec2(gl_FragCoord.x, gl_FragCoord.y);
-
-    vec2 uv = (frag_coord * 2)/ u_resolution;
-    uv -= 1.0;
-    uv.x *= u_resolution.x / u_resolution.y; 
-
-    vec3 rO = vec3(0.0, 2, -8.0); 
-    vec3 rD = normalize(vec3(uv, 1.0));
-     
-    float rad = PI / 2;
-    rO.yz *= rot2D(rad); 
-    rD.yz *= rot2D(rad);
-    rO.xz *= rot2D(rad);
-    rD.xz *= rot2D(rad);
-
-    float d = Raymarch(rO, rD); 
-    vec3 pos = rO + rD * d;
+    vec2 uv = (frag_coord * 2)/ u_resolution;  
+    uv -= 1.0; 
+    uv.x *= u_resolution.x / u_resolution.y; // 1 unit of X == 1 Unit of y
+    //zooms in on the middle fifth, where the effect is most interesting
+    uv *= 0.2;
     
-    float random = N21(uv);
-
-    float light = Get_light(pos);
-    vec3 f_color = vec3(1) * light; 
-    if(d > 45) f_color = vec3(0);
-    float grid_size = 3.0;
-
-    if(mod(pos.x, grid_size) > grid_size - 0.1){
-        f_color = vec3(0);
-    } 
-    if(mod(pos.z, grid_size) > grid_size - 0.1){
-        f_color = vec3(0);
-    } 
+    
+    vec4 baseLightColour = fragColor = vec4(1,2,3,0);
+    
+    float fractalScale = .5;
+    float t = u_time;
+    
+    //the basic idea is that we add up a bunch of lights with accumulating distortion
+    //the layers are rotated and squished around, resulting in a cloudy effect
      
-
-    fragColor = vec4(f_color, 1.0);
+    //we accumulate 18 fractal octaves
+    for ( float i=1.; ++i < 19.; )
+    {
+        //changes fractal ratio each iteration
+        //by octave 18 it's close to 1, so each successive layer will be the same size
+        //so we have a few big layers and a bunch of similarly sized small layers
+        fractalScale += 0.03;
+        
+        //creates a mix of colours
+        ++t;
+        
+        //pow(fractalScale,i) has an exponential effect on the scale
+        //however removing it doesn't actually seem to change very much
+        vec2 b = 7.*uv*pow(fractalScale, i);
+        //vec2 b = 7.*uv;
+        
+        //w is used when calculating the light contribution
+        vec2 w = cos(t - b);
+        //causes radial falloff effect of brightness variation
+        w -= 5.*uv;
+        
+        //in each layer, accumulate adjustments onto the previous layer
+        //so the UVs get more and more screwed up in each layer
+        
+        //first we multiply by a 2x2 matrix with cosines of various values
+        //this ends up rotating each layer
+        //11 is about 3.5pi and 33 is about 10.5pi
+        //so this approximates the sine terms in the rotation matrix
+        uv *= mat2(cos(i + .02*t - vec4(0,11,33,0)));
+        
+        //uv broadly speaking increases away from the origin
+        //so this is a radial polar coordinate
+        vec2 first = vec2(40. * dot(uv ,uv));
+        
+        //the cos adds some random wigglies and creates the 'cloudy' look
+        first *= cos(1e2*uv.yx + t);
+        
+        //tanh functions as a soft ceiling/floor, reducing noisy falloff/interference
+        first = tanh(first);
+        
+        //this term works on the brightness of the accumulating fragment colour itself
+        //so it's most active near lights
+        //however it's been turned down to near zero
+        //if you increase its influence it adds ring-like distortions around the lights
+        float second = cos(4./exp(dot(fragColor,fragColor)/1e2) + t);
+        //second = 0.;
+        
+        //uvs from the previous layer, with the fractal multiplier
+        //this brings the smaller lights in towards the centre
+        vec2 third = fractalScale * uv;
+        
+        //we accumulate modifications to the UVs for each layer
+        uv += first/200. + second/300. + 0.2 * third;
+        
+        //now we add in the lights for this layer
+        //this adjusts the hue of each light
+        vec4 light = (1. + cos(baseLightColour+t));
+        
+        //this term is some kind of remapping operation, tweaks the scale
+        vec2 falloff = 1.5*uv/(.5-dot(uv,uv));
+        
+        //this term makes the lights move in wiggly ways
+        falloff -= 9.*uv.yx;
+        
+        //this term makes the lights shoot around instead of roughly staying put on their layers
+        falloff += t;
+        
+        //this term makes sure each layer has multiple lights, so there will be something near the centre
+        falloff = sin(falloff);
+        
+        //this gives the lights a falloff, screen is white without
+        //removing the dot(w,w) (so it's just 1+i) makes the effect much busier and higher frequency
+        falloff *= 1. + i * dot(w,w);
+        light /= length(falloff);
+        
+        fragColor += light;
+    }
+        
+    //tonemapping operation
+    fragColor = 25.6 / (min(fragColor, 13.) + 164. / fragColor) - dot(uv, uv) / 250.;
 }
-
-//uv *= 10;
-
-// vec2 gv = fract(uv);
-// vec2 grid = step(0.95, gv); 
-//
-// vec2 pos = floor(uv) + 0.5;   
-//
-//
-// vec3 color = vec3(0);
-// color += grid.x * vec3(0.3,0,0.3); 
-// color += grid.y * vec3(0,0.3,0.3); 
-//
-//
-// float circle = Circle(uv,pos, 0.1);
-//
-// float center = Circle(uv, vec2(0), 0.1);
-//
-
