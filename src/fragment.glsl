@@ -36,10 +36,10 @@ float Value_noise(vec2 uv)
 float Fbm(vec2 uv){
     float fbm = 0.0; 
     float amp = 1.0;
-    for(int i = 0 ; i < 4 ; i++)
+    for(int i = 0 ; i < 19 ; i++)
     {
         fbm += Value_noise(uv) * amp;
-        uv *= 2.0; // freq 
+        uv *= 3.0; // freq 
         amp *= 0.5;
     }
     return fbm / 2; 
@@ -50,7 +50,11 @@ mat2 Rot2D(float angle){
                 sin(angle),  cos(angle));
 }
 
-
+vec3 Get_col(float t)
+{
+    float rand = N21(vec2(t));
+    return vec3(sin(rand), cos(rand), sin(rand * rand));
+}
 void main()
 {
     vec2 res = u_resolution.xy;
@@ -58,34 +62,25 @@ void main()
     vec2 uv = (frag_coord * 2.0)/ u_resolution;  
     uv -= 1.0;  
     uv.x *= u_resolution.x / u_resolution.y; 
-    uv *= 2.0; 
 
     vec3 color = vec3(0); 
+     
+    float t = u_time;
+    float fract_scale = 0.2;
+    for(int i = 0 ; i < 1 ; i++)
+    {
+        fract_scale += 0.03;
+        uv *= Rot2D(++t * 0.12);
+        uv.x += sin(uv.y); 
+        uv.y += cos(uv.x); 
 
-    float rad = 0.72; 
-    uv.x += Fbm(uv + 0.3 * sin(2 * u_time));  
-    uv.y += Fbm(uv + 0.1 * cos(1 * u_time));  
-
-    float theta = atan(uv.y, uv.x);
-    float twist_strength = 1.0; 
-    
-    float r = length(uv);
-    theta += (r * twist_strength) - u_time * 2.0; 
-
-
-    // 3. Convert back to Cartesian Coordinates
-    uv = vec2(r * cos(theta), r * sin(theta));
-
-    // Now, anything you draw using 'uv' (like your grid or blobs) 
-    // will be sucked into a swirling spiral!
-
-    vec2 gv = fract(uv);
-    if(gv.x > 0.98){
-        color = vec3(0.8, 0,0);
+        float light = 0.02/ length(uv - sin(t));
+        color += light * Get_col(t);
+        // vec2 gv = fract(uv);
+        // if(gv.x > 0.98) color += vec3(1.0, 0.0, 0.0);
+        // if(gv.y > 0.98) color += vec3(0.0, 1.0, 0.0);
     }
-    if(gv.y > 0.98){
-        color = vec3(0,0.8,0);
-    }
+
 
     frag_color = vec4(color, 1);
 } 
