@@ -9,7 +9,7 @@ uniform sampler2D u_main;
 out vec4 frag_color;
 
 #define PI 3.1459
-#define MAX_DIST 64
+#define MAX_DIST 16 
 #define MIN_DIST 0.001 
 
 float Sd_sph(vec3 ray_pos, vec3 sph_pos, float radius)
@@ -26,14 +26,10 @@ mat2 Rot2d(float rad)
 
 float Map(vec3 p)
 {
-    float fract_scale = 0.5;
-    float plane = p.y;
-
-    // fract_scale += 0.3;
-    // vec2 pos = p.xz * Rot2d(sin(p.z)); 
-    // plane += fract_scale * sin(pos.x + u_time) + fract_scale * cos(pos.y + u_time);
-
-    return  plane;
+    float plane_bottom = p.y;
+    float plane_top    = 6 - p.y;
+    
+    return  min(plane_bottom, plane_top);
 }
 
 float Render(vec3 r_o, vec3 r_d)
@@ -113,14 +109,17 @@ float Get_light(vec3 pos, vec3 r_o)
     float spec_amount = max(dot(camera_dir, half_vec), 0.0);
     float specular = pow(spec_amount, 100.0); 
 
-
-    // //float light = 0.5 / length(pos);
-    float light = diffuse;
+    //4 + 4*smoothstep(0,0.7,sin(x+t))
+    vec2 falloff = fract(pos.xz / 3); 
+    falloff -= 0.5;
+    float light = 0.0;
+    light = 0.05 / length(falloff);
+    //float light = diffuse;
     float shadow = Get_shadow(pos, light_dir);
     float ao = Get_AO(pos, N);
 
-    light *= shadow;
-    light *= ao;
+    // light *= shadow;
+    // light *= ao;
 
     return light; 
 }
@@ -133,30 +132,28 @@ void main()
     uv -= 1.0;  
     uv.x *= u_resolution.x / u_resolution.y; 
 
-    vec3 r_o = vec3(0, 3, -5);
+    vec3 r_o = vec3(0, 2, -5);
     vec3 r_d = normalize(vec3(uv, 1.0)); 
 
-    float rad = PI / 8;
+    float rad = PI / 6;
     mat2 rot = Rot2d(rad);
-    r_o.yz *= rot; 
-    r_d.yz *= rot; 
+    // r_o.yz *= rot; 
+    // r_d.yz *= rot; 
 
     float hit_dist = Render(r_o, r_d);
     vec3 final_color = vec3(0.0);
 
     // 1. Surface Lighting
-    if(hit_dist < MAX_DIST) {
+    if(hit_dist < MAX_DIST) 
+    {
         vec3 p = r_o + r_d * hit_dist;
 
-        // Using your original Get_light function
         float surface_light = Get_light(p, r_o); 
-        final_color = vec3(0.5) * surface_light; 
+        final_color = vec3(abs(sin(p.x * 0.2)), abs(sin(p.y * 0.3)), abs(sin(p.z * 0.2))) * surface_light; 
         vec2 gv = fract(p.xz);
-        float grid_line = smoothstep(0.92, 0.97, max(gv.x, gv.y));
-        final_color += vec3(1) * grid_line;
+        //float grid_line = smoothstep(0.92, 0.97, max(gv.x, gv.y));
+        //final_color += vec3(1) * grid_line;
     }
-    
-
 
     frag_color = vec4(final_color, 1.0); 
 }
