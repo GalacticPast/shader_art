@@ -16,6 +16,12 @@ float Sd_sphere(vec3 p, vec3 sph_pos, float radius)
     return sph;
 }
 
+float Sd_torus( vec3 p, vec2 t )
+{
+  vec2 q = vec2(length(p.xz)-t.x,p.y);
+  return length(q)-t.y;
+}
+
 float N21(vec2 p)
 {
     float rand = fract(sin(p.x * 191.123 + p.y * 234.342) * 8324.84353); 
@@ -57,18 +63,23 @@ float Fbm(vec2 uv){
         uv *= 3.0; // freq 
         amp *= 0.5;
     }
-    return fbm / 2; 
+    return fbm / 2.0; 
 }
 
 float Map(vec3 p)
 {
-    float plane = p.y + 1;
+    float plane = p.y + 1.0;
     float noise = Fbm(p.xz + 0.05 * u_time);
     float radius = 2.5 +  noise * 0.5;
     //float radius = 2.5;
     float sph = Sd_sphere(p, vec3(0.0, 0.0, 0.0), radius);
     //float d = min(sph, plane);
-    float d = sph;
+    p.xz *= Rot2D(PI / 2.0);
+    p.xy *= Rot2D(PI / 2.0);
+    float tours = Sd_torus(p, vec2(3, 0.1));
+
+    float d = tours;
+    
     return d;
 }
 vec3 Get_normal(vec3 p) 
@@ -85,7 +96,7 @@ vec3 Get_normal(vec3 p)
 
 float Get_light(vec3 p)
 {
-    vec3 light_pos = vec3(0, 0, -10);
+    vec3 light_pos = vec3(0.0, 0.0, -10.0);
     vec3 N = Get_normal(p);
 
     vec3 light_dir = normalize(light_pos - p);
@@ -94,18 +105,18 @@ float Get_light(vec3 p)
     return max(light, 0.0);
 }
 
-
 void main()
 {
-    vec2 uv = (gl_FragCoord.xy * 2)/ u_resolution.xy;
+    vec2 uv = (gl_FragCoord.xy * 2.0)/ u_resolution.xy;
     uv -= 1; 
     uv.x *= u_resolution.x / u_resolution.y;
     //zoomed in
-    vec3 r_o = vec3(0,1.8,-2.3);
+    //vec3 r_o = vec3(0,1.8,-2.3);
+    vec3 r_o = vec3(0.0, 0.0, -5);
     vec3 r_d = normalize(vec3(vec2(uv), 1.0));
 
-    r_o.xz *= Rot2D(PI);
-    r_d.xz *= Rot2D(PI);
+    // r_o.xz *= Rot2D(PI);
+    // r_d.xz *= Rot2D(PI);
     //vec3 r_o = vec3(0,1.0,-3);
     //vec3 r_o = vec3(0.0,0.0,-5);
 
@@ -118,6 +129,7 @@ void main()
         vec3 pos = r_o + r_d * t;
         float d = Map(pos);
         t += d;
+        glow += 0.1 / d;
         if(d < 0.001)
         {
             hit = true;
@@ -127,8 +139,10 @@ void main()
     }
 
     vec3 hit_pos = r_o + r_d * t;
-    float light =  Get_light(hit_pos);
+    // float light = Get_light(hit_pos);
+    // vec3 color = light * vec3(1.0);
     vec3 color = vec3(0.0);
+    color += glow * vec3(0.98, 0.2, 0.0);
         
     if(hit)
     {
@@ -140,16 +154,15 @@ void main()
         float densityU = 10.0;
         float densityV = 10.0;
         
-        vec2 g = fract(vec2(u * densityU, v * densityV));
-        color += 0.05 / length(g) * vec3(1.0);
         
         // float line_thickness = 0.95; 
         // if(g.x > line_thickness || g.y > line_thickness)
+
         // {
         //     color = vec3(0.0); 
         // }
 
     }
-
     fragColor = vec4(color, 1.0);
 }
+
