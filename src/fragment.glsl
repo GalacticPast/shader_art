@@ -6,6 +6,9 @@ uniform float u_time;         // seconds since playback started
 
 uniform sampler2D u_main;
 
+uniform vec3 ray_origin;
+uniform vec3 look_at_dir;
+
 out vec4 fragColor;
 
 #define PI 3.14159
@@ -20,6 +23,13 @@ float Sd_torus( vec3 p, vec2 t )
 {
   vec2 q = vec2(length(p.xz)-t.x,p.y);
   return length(q)-t.y;
+}
+
+float Sd_capsule( vec3 p, vec3 a, vec3 b, float r )
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  return length( pa - ba*h ) - r;
 }
 
 float N21(vec2 p)
@@ -69,16 +79,20 @@ float Fbm(vec2 uv){
 float Map(vec3 p)
 {
     float plane = p.y + 1.0;
-    float noise = Fbm(p.xz + 0.05 * u_time);
-    float radius = 2.5 +  noise * 0.5;
-    //float radius = 2.5;
-    float sph = Sd_sphere(p, vec3(0.0, 0.0, 0.0), radius);
-    //float d = min(sph, plane);
-    p.xz *= Rot2D(PI / 2.0);
-    p.xy *= Rot2D(PI / 2.0);
-    float tours = Sd_torus(p, vec2(3, 0.1));
+    float noise = Fbm(p.zz - 0.05 * u_time);
 
-    float d = tours;
+    //float d = min(sph, plane);
+    // p.xy *= Rot2D(PI / 2.0);
+    // p.xz *= Rot2D(PI / 2.0);
+    p.z += 1 / sin(20 * u_time);
+    float radius = 0.1 + 0.1 * sin(2 *  p.z - u_time);
+    float capsule = Sd_capsule(p,vec3(0.0), vec3(0.0,0.0,10.0), 1);
+    
+    float d = min(capsule, plane);
+    // //float d = capsule;
+    // d = min(d, capsule_1);
+    // d = min(d, capsule_2);
+    // d = min(d, capsule_3);
     
     return d;
 }
@@ -96,7 +110,7 @@ vec3 Get_normal(vec3 p)
 
 float Get_light(vec3 p)
 {
-    vec3 light_pos = vec3(0.0, 0.0, -10.0);
+    vec3 light_pos = vec3(0.0, 10.0, -10.0);
     vec3 N = Get_normal(p);
 
     vec3 light_dir = normalize(light_pos - p);
@@ -104,21 +118,31 @@ float Get_light(vec3 p)
     float light = dot(N, light_dir);
     return max(light, 0.0);
 }
+float Get_glow(float dist, float radius, float intensity)
+{
+	return pow(radius / max(dist, 1e-6), intensity);	
+}
+
+vec3 Get_camera_rd(vec2 uv, vec3 ro, vec3 ta, float zoom) 
+{
+
+    vec3 f = normalize(ta - ro);
+    vec3 worldUp = vec3(0.0, 1.0, 0.0);
+    vec3 r = normalize(cross(worldUp, f));
+    vec3 u = cross(f, r);
+    
+    return normalize(uv.x * r + uv.y * u + f * zoom);
+}
 
 void main()
 {
     vec2 uv = (gl_FragCoord.xy * 2.0)/ u_resolution.xy;
     uv -= 1; 
     uv.x *= u_resolution.x / u_resolution.y;
-    //zoomed in
-    //vec3 r_o = vec3(0,1.8,-2.3);
-    vec3 r_o = vec3(0.0, 0.0, -5);
-    vec3 r_d = normalize(vec3(vec2(uv), 1.0));
 
-    // r_o.xz *= Rot2D(PI);
-    // r_d.xz *= Rot2D(PI);
-    //vec3 r_o = vec3(0,1.0,-3);
-    //vec3 r_o = vec3(0.0,0.0,-5);
+    vec3 r_o = ray_origin;
+    vec3 r_d = Get_camera_rd(uv, r_o, look_at_dir, 1.0);
+
 
     float t = 0.0;
     float glow = 0.0;
@@ -128,8 +152,9 @@ void main()
     {
         vec3 pos = r_o + r_d * t;
         float d = Map(pos);
-        t += d;
-        glow += 0.1 / d;
+        t += d * 0.5;
+        float glow_mask = sin(-pos.z + 3 * u_time);
+        glow += Get_glow(d, 0.01, 0.8) * glow_mask;
         if(d < 0.001)
         {
             hit = true;
@@ -139,10 +164,10 @@ void main()
     }
 
     vec3 hit_pos = r_o + r_d * t;
-    // float light = Get_light(hit_pos);
-    // vec3 color = light * vec3(1.0);
-    vec3 color = vec3(0.0);
-    color += glow * vec3(0.98, 0.2, 0.0);
+    float light = Get_light(hit_pos);
+    vec3 color = light * vec3(1.0);
+    // vec3 color = vec3(0.0);
+    // color += glow * vec3(1.0, 0.0, 0.0);
         
     if(hit)
     {
