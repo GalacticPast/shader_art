@@ -72,21 +72,7 @@ float Map(vec3 p)
     float freq = 1.0;
     float amp = 1.0;
     float speed = 2.0;
-
-    for(int i = 0 ; i < 2 ; i++)
-    {
-        float wave_x = p.x * freq + u_time * speed;
-        float wave_z = p.z * freq * 0.8 + u_time * speed * 1.2; 
-        
-        // 2. Wave Shape: Use the exponential trick for sharp crests
-        float sharp_wave = exp(amp * sin(wave_x + wave_z) - 1.0);
-        
-        // Add this iteration's wave to the total height
-        wave_weight += sharp_wave;
-        freq *= 2.0;
-        amp *= 0.5;
-        speed *= 1.2;
-    }
+    
 
     float plane = p.y + 1.0;
     return plane + wave_weight;
@@ -115,7 +101,7 @@ float Get_light(vec3 p, vec3 cam_pos)
      
     // Both vectors now point away from the surface properly
     float specular = clamp(dot(ref_light_vector, V), 0.0, 1.0);
-    specular = 0.2 * pow(specular, 30); 
+    specular = 0.8 * pow(specular, 30); 
 
     float diff = clamp(dot(L, N), 0.0, 1.0);
     
@@ -157,10 +143,14 @@ void main()
 
     vec3 p = r_o + r_d * t; 
 
-    if(p.z < MAX_DIST)
+    if(t < MAX_DIST)
     {
         float light = Get_light(p, r_o); 
         color = light * vec3(0.0, 0.8,0.835);
+    }
+    else
+    {
+        color = vec3(0.3, 0.3,0.3);
     }
 
     fragColor = vec4(color, 1.0);

@@ -88,7 +88,7 @@ int main()
 
 void set_camera_pos(camera_state *c_state)
 {
-    float   speed    = 0.05f;
+    float   speed    = 10.0;
     Vector3 world_up = {0.0f, 1.0f, 0.0f};
 
     float *yaw   = &c_state->yaw;
@@ -97,8 +97,17 @@ void set_camera_pos(camera_state *c_state)
     // 1. Calculate mouse delta
     Vector2 mouse_pos   = GetMousePosition();
     float   sensitivity = 0.1f;
-    float   d_x         = mouse_pos.x - c_state->prev_mouse_pos.x;
-    float   d_y         = mouse_pos.y - c_state->prev_mouse_pos.y;
+
+    float d_x = 0.0;
+    float d_y = 0.0;
+    if (IsKeyDown(KEY_RIGHT))
+        d_x -= speed;
+    if (IsKeyDown(KEY_LEFT))
+        d_x += speed;
+    if (IsKeyDown(KEY_UP))
+        d_y += speed;
+    if (IsKeyDown(KEY_DOWN))
+        d_y -= speed;
 
     c_state->prev_mouse_pos = mouse_pos;
 
@@ -129,21 +138,21 @@ void set_camera_pos(camera_state *c_state)
         move_delta = Vector3Subtract(move_delta, forward);
 
     // FIX 3: Swap A and D so strafing directions are natural
-    if (IsKeyDown(KEY_A))
-        move_delta = Vector3Subtract(move_delta, right);
     if (IsKeyDown(KEY_D))
+        move_delta = Vector3Subtract(move_delta, right);
+    if (IsKeyDown(KEY_A))
         move_delta = Vector3Add(move_delta, right);
 
-    if (IsKeyDown(KEY_UP))
+    if (IsKeyDown(KEY_E))
         move_delta = Vector3Add(move_delta, world_up);
-    if (IsKeyDown(KEY_DOWN))
+    if (IsKeyDown(KEY_Q))
         move_delta = Vector3Subtract(move_delta, world_up);
 
     // 3. Apply position updates
     if (Vector3Length(move_delta) > 0.0f)
     {
         move_delta = Vector3Normalize(move_delta);
-        move_delta = Vector3Scale(move_delta, speed);
+        move_delta = Vector3Scale(move_delta, speed * sensitivity);
 
         c_state->ray_origin[0] += move_delta.x;
         c_state->ray_origin[1] += move_delta.y;
