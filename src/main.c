@@ -8,7 +8,9 @@ typedef struct camera_state
 {
     float   ray_origin[3];
     float   look_at[3];
-    Vector2 p_c_p;
+    Vector2 prev_mouse_pos;
+    float   yaw;
+    float   pitch;
 } camera_state;
 
 void set_camera_pos(camera_state *state);
@@ -33,11 +35,12 @@ int main()
     float resolution[2] = {width, height};
 
     struct camera_state c_state = {
-        .ray_origin = {0.0, 0.0, -3.0},
-        .look_at    = {0.0, 0.0, 0.0},
-        .p_c_p      = {0.0, 0.0},
+        .ray_origin     = {0.0, 0.0, -3.0},
+        .look_at        = {0.0, 0.0, 0.0},
+        .prev_mouse_pos = GetMousePosition(),
+        .yaw            = 0.0,
+        .pitch          = 0.0,
     };
-
     long lastModTime
         = GetFileModTime("../src/fragment.glsl");
 
@@ -88,19 +91,36 @@ void set_camera_pos(camera_state *c_state)
     float   speed    = 0.05f;
     Vector3 world_up = {0.0f, 1.0f, 0.0f};
 
-    // 1. Convert float arrays into temporary Raylib Vector3s
-    Vector3 orig = {c_state->ray_origin[0], c_state->ray_origin[1], c_state->ray_origin[2]};
-    Vector3 look = {c_state->look_at[0], c_state->look_at[1], c_state->look_at[2]};
+    float *yaw   = &c_state->yaw;
+    float *pitch = &c_state->pitch;
 
-    // 2. Calculate the normalized FORWARD vector (target - origin)
-    Vector3 forward = Vector3Subtract(look, orig);
-    forward         = Vector3Normalize(forward);
+    // 1. Calculate mouse delta
+    Vector2 mouse_pos   = GetMousePosition();
+    float   sensitivity = 0.1f;
+    float   d_x         = mouse_pos.x - c_state->prev_mouse_pos.x;
+    float   d_y         = mouse_pos.y - c_state->prev_mouse_pos.y;
 
-    // 3. Calculate the normalized RIGHT vector (cross product of forward and world up)
-    Vector3 right = Vector3CrossProduct(forward, world_up);
-    right         = Vector3Normalize(right);
+    c_state->prev_mouse_pos = mouse_pos;
 
-    // 4. Create a movement delta vector
+    *yaw   += d_x * sensitivity;
+    *pitch += d_y * sensitivity; // Change to -= if you prefer inverted vertical look
+
+    // FIX 1: Clamp PITCH (up/down), leave yaw alone so you can spin 360 degrees
+    if (*pitch > 89.0f)
+        *pitch = 89.0f;
+    if (*pitch < -89.0f)
+        *pitch = -89.0f;
+
+    // FIX 2: Dereference pointers (*yaw and *pitch) inside the trig functions
+    Vector3 direction;
+    direction.x = cosf(DEG2RAD * *yaw) * cosf(DEG2RAD * *pitch);
+    direction.y = sinf(DEG2RAD * *pitch);
+    direction.z = sinf(DEG2RAD * *yaw) * cosf(DEG2RAD * *pitch);
+
+    Vector3 forward = Vector3Normalize(direction);
+    Vector3 right   = Vector3Normalize(Vector3CrossProduct(forward, world_up));
+
+    // 2. Create a movement delta vector
     Vector3 move_delta = {0.0f, 0.0f, 0.0f};
 
     if (IsKeyDown(KEY_W))
@@ -108,30 +128,29 @@ void set_camera_pos(camera_state *c_state)
     if (IsKeyDown(KEY_S))
         move_delta = Vector3Subtract(move_delta, forward);
 
+    // FIX 3: Swap A and D so strafing directions are natural
     if (IsKeyDown(KEY_A))
-        move_delta = Vector3Add(move_delta, right);
-    if (IsKeyDown(KEY_D))
         move_delta = Vector3Subtract(move_delta, right);
+    if (IsKeyDown(KEY_D))
+        move_delta = Vector3Add(move_delta, right);
 
     if (IsKeyDown(KEY_UP))
         move_delta = Vector3Add(move_delta, world_up);
     if (IsKeyDown(KEY_DOWN))
         move_delta = Vector3Subtract(move_delta, world_up);
 
-    // 5. If we have movement input, apply it back to our state arrays
+    // 3. Apply position updates
     if (Vector3Length(move_delta) > 0.0f)
     {
-        // Normalize the movement direction and scale by frame speed
         move_delta = Vector3Normalize(move_delta);
         move_delta = Vector3Scale(move_delta, speed);
 
-        // Update BOTH the ray origin and look_at target so the camera preserves its view angle
         c_state->ray_origin[0] += move_delta.x;
         c_state->ray_origin[1] += move_delta.y;
         c_state->ray_origin[2] += move_delta.z;
-
-        c_state->look_at[0] += move_delta.x;
-        c_state->look_at[1] += move_delta.y;
-        c_state->look_at[2] += move_delta.z;
     }
+
+    c_state->look_at[0] = c_state->ray_origin[0] + forward.x;
+    c_state->look_at[1] = c_state->ray_origin[1] + forward.y;
+    c_state->look_at[2] = c_state->ray_origin[2] + forward.z;
 }
