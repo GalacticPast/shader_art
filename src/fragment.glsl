@@ -109,7 +109,7 @@ float Map(vec3 p)
     // d = min(d, capsule_2);
     // d = min(d, capsule_3);
     // d = min(d, capsule_4);
-    // d = min(d, plane);
+    d = min(d, plane);
     return d;
 }
 vec3 Get_normal(vec3 p) 
@@ -189,10 +189,10 @@ void main()
     }
 
     vec3 hit_pos = r_o + r_d * t;
-    // float light = Get_light(hit_pos);
-    // vec3 color = light * vec3(1.0);
-    vec3 color = vec3(0.0);
-    color += glow * vec3(0.788, 0.161, 0.161);
+    float light = Get_light(hit_pos);
+    vec3 color = light * vec3(1.0);
+    // vec3 color = vec3(0.0);
+    // color += glow * vec3(0.788, 0.161, 0.161);
         
     fragColor = vec4(color, 1.0);
 }

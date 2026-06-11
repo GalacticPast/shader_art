@@ -1,5 +1,5 @@
 #include "raylib.h"
-#include "stdio.h"
+#include "raymath.h"
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -85,40 +85,53 @@ int main()
 
 void set_camera_pos(camera_state *c_state)
 {
-    float *r_o   = c_state->ray_origin;
-    float *l_a   = c_state->look_at;
-    float  speed = 0.05;
+    float   speed    = 0.05f;
+    Vector3 world_up = {0.0f, 1.0f, 0.0f};
+
+    // 1. Convert float arrays into temporary Raylib Vector3s
+    Vector3 orig = {c_state->ray_origin[0], c_state->ray_origin[1], c_state->ray_origin[2]};
+    Vector3 look = {c_state->look_at[0], c_state->look_at[1], c_state->look_at[2]};
+
+    // 2. Calculate the normalized FORWARD vector (target - origin)
+    Vector3 forward = Vector3Subtract(look, orig);
+    forward         = Vector3Normalize(forward);
+
+    // 3. Calculate the normalized RIGHT vector (cross product of forward and world up)
+    Vector3 right = Vector3CrossProduct(forward, world_up);
+    right         = Vector3Normalize(right);
+
+    // 4. Create a movement delta vector
+    Vector3 move_delta = {0.0f, 0.0f, 0.0f};
 
     if (IsKeyDown(KEY_W))
-    {
-        r_o[2] += speed;
-    }
+        move_delta = Vector3Add(move_delta, forward);
     if (IsKeyDown(KEY_S))
-    {
-        r_o[2] -= speed;
-    }
+        move_delta = Vector3Subtract(move_delta, forward);
+
     if (IsKeyDown(KEY_A))
-    {
-        r_o[0] -= speed;
-    }
+        move_delta = Vector3Add(move_delta, right);
     if (IsKeyDown(KEY_D))
-    {
-        r_o[0] += speed;
-    }
+        move_delta = Vector3Subtract(move_delta, right);
+
     if (IsKeyDown(KEY_UP))
-    {
-        r_o[1] += speed;
-    }
+        move_delta = Vector3Add(move_delta, world_up);
     if (IsKeyDown(KEY_DOWN))
+        move_delta = Vector3Subtract(move_delta, world_up);
+
+    // 5. If we have movement input, apply it back to our state arrays
+    if (Vector3Length(move_delta) > 0.0f)
     {
-        r_o[1] -= speed;
-    }
-    if (IsKeyDown(KEY_LEFT))
-    {
-        l_a[1] -= 0.009;
-    }
-    if (IsKeyDown(KEY_RIGHT))
-    {
-        l_a[1] += 0.009;
+        // Normalize the movement direction and scale by frame speed
+        move_delta = Vector3Normalize(move_delta);
+        move_delta = Vector3Scale(move_delta, speed);
+
+        // Update BOTH the ray origin and look_at target so the camera preserves its view angle
+        c_state->ray_origin[0] += move_delta.x;
+        c_state->ray_origin[1] += move_delta.y;
+        c_state->ray_origin[2] += move_delta.z;
+
+        c_state->look_at[0] += move_delta.x;
+        c_state->look_at[1] += move_delta.y;
+        c_state->look_at[2] += move_delta.z;
     }
 }
