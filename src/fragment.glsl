@@ -12,6 +12,7 @@ uniform vec3 look_at_dir;
 out vec4 fragColor;
 
 #define PI 3.14159
+#define MAX_DIST 100 
 
 float Sd_sphere(vec3 p, vec3 sph_pos, float radius)
 {
@@ -30,6 +31,17 @@ float Sd_capsule( vec3 p, vec3 a, vec3 b, float r )
   vec3 pa = p - a, ba = b - a;
   float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
   return length( pa - ba*h ) - r;
+}
+
+vec3 op_cheap_bend( vec3 p, float k ) 
+{
+    // k is the bending amount/frequency
+    float c = cos(k * p.x);
+    float s = sin(k * p.x);
+    mat2  m = mat2(c, -s, s, c);
+    
+    // Return the warped space coordinates
+    return vec3(m * p.xy, p.z);
 }
 
 float N21(vec2 p)
@@ -75,25 +87,29 @@ float Fbm(vec2 uv){
     }
     return fbm / 2.0; 
 }
-
+vec3 op_sin_bend(vec3 p, float amplitude, float frequency, vec3 axis) {
+    float wave = amplitude * sin(p.z * frequency - 2 * u_time);
+    
+    return vec3(p.x - wave * axis.x, p.y - wave * axis.y, p.z - wave * axis.z);
+}
 float Map(vec3 p)
 {
-    float plane = p.y + 1.0;
-    float noise = Fbm(p.zz - 0.05 * u_time);
-
-    //float d = min(sph, plane);
-    // p.xy *= Rot2D(PI / 2.0);
-    // p.xz *= Rot2D(PI / 2.0);
-    p.z += 1 / sin(20 * u_time);
-    float radius = 0.1 + 0.1 * sin(2 *  p.z - u_time);
-    float capsule = Sd_capsule(p,vec3(0.0), vec3(0.0,0.0,10.0), 1);
+    vec3 bend_pos = op_sin_bend(p, 0.5, p.z * 0.1, vec3(1.0, 1.0, 0.0)); 
+    float capsule = Sd_capsule(bend_pos, vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, 15.0), 0.2);
+    bend_pos = op_sin_bend(p, 0.3, 5.0, vec3(0.0, 1.0, 0.0)); 
+    float capsule_1 = Sd_capsule(bend_pos, vec3(-1.0, -1.0, 1.0), vec3(10.0, 0.0, 5.0), 0.01);
+    // float capsule_2 = Sd_capsule(bend_pos, vec3(0.0, -1.0, 1.0), vec3(0.0, 19.0, 15.0), 0.1);
+    // float capsule_3 = Sd_capsule(bend_pos, vec3(1.0, -5.0, 1.0), vec3(0.0, 21.0, 15.0), 0.1);
+    // float capsule_4 = Sd_capsule(bend_pos, vec3(-4.0, -9.0, 1.0), vec3(10.0, 28.0, 15.0), 0.1);
+    // float capsule_5 = Sd_capsule(bend_pos, vec3(-8.0, -15.0, 1.0), vec3(10.0, 32.0, 15.0), 0.1);
     
-    float d = min(capsule, plane);
-    // //float d = capsule;
+    float plane = p.y + 2.0;
+    float d = min(capsule, capsule_1);
     // d = min(d, capsule_1);
     // d = min(d, capsule_2);
     // d = min(d, capsule_3);
-    
+    // d = min(d, capsule_4);
+    // d = min(d, plane);
     return d;
 }
 vec3 Get_normal(vec3 p) 
@@ -134,6 +150,15 @@ vec3 Get_camera_rd(vec2 uv, vec3 ro, vec3 ta, float zoom)
     return normalize(uv.x * r + uv.y * u + f * zoom);
 }
 
+vec3 ACES(vec3 x) {
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 void main()
 {
     vec2 uv = (gl_FragCoord.xy * 2.0)/ u_resolution.xy;
@@ -148,46 +173,27 @@ void main()
     float glow = 0.0;
 
     bool hit = false;
-    for(int i = 0 ; i < 100 ; i++)
+    for(int i = 0 ; i < MAX_DIST ; i++)
     {
         vec3 pos = r_o + r_d * t;
         float d = Map(pos);
-        t += d * 0.5;
-        float glow_mask = sin(-pos.z + 3 * u_time);
-        glow += Get_glow(d, 0.01, 0.8) * glow_mask;
+        t += d;
+        float glow_mask = sin(pos.z -  u_time * 3);
+        glow += Get_glow(d, 0.4, 0.3) * glow_mask;
         if(d < 0.001)
         {
             hit = true;
             break;
         } 
-        if(d > 100.0)break;
+        if(d > MAX_DIST)break;
     }
 
     vec3 hit_pos = r_o + r_d * t;
-    float light = Get_light(hit_pos);
-    vec3 color = light * vec3(1.0);
-    // vec3 color = vec3(0.0);
-    // color += glow * vec3(1.0, 0.0, 0.0);
+    // float light = Get_light(hit_pos);
+    // vec3 color = light * vec3(1.0);
+    vec3 color = vec3(0.0);
+    color += glow * vec3(0.788, 0.161, 0.161);
         
-    if(hit)
-    {
-        vec3 normal = normalize(hit_pos);
-
-        float u = atan(normal.z, normal.x); 
-        float v = asin(normal.y);           
-
-        float densityU = 10.0;
-        float densityV = 10.0;
-        
-        
-        // float line_thickness = 0.95; 
-        // if(g.x > line_thickness || g.y > line_thickness)
-
-        // {
-        //     color = vec3(0.0); 
-        // }
-
-    }
     fragColor = vec4(color, 1.0);
 }
 
