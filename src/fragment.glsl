@@ -92,25 +92,21 @@ vec3 op_sin_bend(vec3 p, float amplitude, float frequency, vec3 axis) {
     
     return vec3(p.x - wave * axis.x, p.y - wave * axis.y, p.z - wave * axis.z);
 }
+vec3 op_cos_bend(vec3 p, float amplitude, float frequency, vec3 axis) {
+    float wave = amplitude * cos(p.z * frequency - 2 * u_time);
+    
+    return vec3(p.x - wave * axis.x, p.y - wave * axis.y, p.z - wave * axis.z);
+}
+
 float Map(vec3 p)
 {
-    vec3 bend_pos = op_sin_bend(p, 0.5, p.z * 0.1, vec3(1.0, 1.0, 0.0)); 
-    float capsule = Sd_capsule(bend_pos, vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, 15.0), 0.2);
-    bend_pos = op_sin_bend(p, 0.3, 5.0, vec3(0.0, 1.0, 0.0)); 
-    float capsule_1 = Sd_capsule(bend_pos, vec3(-1.0, -1.0, 1.0), vec3(10.0, 0.0, 5.0), 0.01);
-    // float capsule_2 = Sd_capsule(bend_pos, vec3(0.0, -1.0, 1.0), vec3(0.0, 19.0, 15.0), 0.1);
-    // float capsule_3 = Sd_capsule(bend_pos, vec3(1.0, -5.0, 1.0), vec3(0.0, 21.0, 15.0), 0.1);
-    // float capsule_4 = Sd_capsule(bend_pos, vec3(-4.0, -9.0, 1.0), vec3(10.0, 28.0, 15.0), 0.1);
-    // float capsule_5 = Sd_capsule(bend_pos, vec3(-8.0, -15.0, 1.0), vec3(10.0, 32.0, 15.0), 0.1);
-    
+    vec3 bend_pos = op_sin_bend(p, 0.3, 2, vec3(0.0, 1.0, 0.0)); 
+    float capsule = Sd_capsule(bend_pos, vec3(0.0), vec3(0.0, -2.0, 30.0),0.4);
+
     float plane = p.y + 2.0;
-    float d = min(capsule, capsule_1);
-    // d = min(d, capsule_1);
-    // d = min(d, capsule_2);
-    // d = min(d, capsule_3);
-    // d = min(d, capsule_4);
-    d = min(d, plane);
-    return d;
+    float d = capsule;
+
+    return d * 0.5;
 }
 vec3 Get_normal(vec3 p) 
 {
@@ -178,8 +174,8 @@ void main()
         vec3 pos = r_o + r_d * t;
         float d = Map(pos);
         t += d;
-        float glow_mask = sin(pos.z -  u_time * 3);
-        glow += Get_glow(d, 0.4, 0.3) * glow_mask;
+        float glow_mask = sin(pos.z * 0.4 -  u_time * 4);
+        glow += Get_glow(d, 0.01, 0.59) * glow_mask;
         if(d < 0.001)
         {
             hit = true;
@@ -189,11 +185,11 @@ void main()
     }
 
     vec3 hit_pos = r_o + r_d * t;
-    float light = Get_light(hit_pos);
-    vec3 color = light * vec3(1.0);
-    // vec3 color = vec3(0.0);
-    // color += glow * vec3(0.788, 0.161, 0.161);
-        
+    // float light = Get_light(hit_pos);
+    // vec3 color = light * vec3(1.0);
+    vec3 color = vec3(0.0);
+    color += glow * vec3(0.788, 0.161, 0.161);
+
     fragColor = vec4(color, 1.0);
 }
 
