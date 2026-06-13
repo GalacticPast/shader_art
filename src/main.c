@@ -35,8 +35,8 @@ int main()
     float resolution[2] = {width, height};
 
     struct camera_state c_state = {
-        .ray_origin     = {0.0, 0.0, -3.0},
-        .look_at        = {0.0, 0.0, 0.0},
+        .ray_origin     = {0.0, 10.0, 0.0},
+        .look_at        = {0.0, 0.0, -10.0},
         .prev_mouse_pos = GetMousePosition(),
         .yaw            = 0.0,
         .pitch          = 0.0,
