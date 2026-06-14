@@ -1,5 +1,5 @@
 #version 330
-//https://www.shadertoy.com/view/wsfGWH
+
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform vec3 ray_origin;
@@ -9,21 +9,20 @@ out vec4 fragColor;
 
 const float PI = 3.14159265;
 
+const int MAX_STEPS = 100;
 const float MAX_DIST = 100.0;
 const float MIN_DIST = 0.001;
-const float EARTH_RAD = 6360e3; 
+const float EARTH_RAD = 6360e3;
 const float ATMOS_RAD  = 6420e3;
-const float SUN_INTENSITY = 20.0; 
+const float SUN_INTENSITY = 9.0;
 
-const float G = 0.76; // for mie scattering
-// Rayleigh Scattering
-const float RAYLEIGHSCALEHEIGHT = 7994.0; // 7994.0
+const float G = 0.76;
+
+const float RAYLEIGHSCALEHEIGHT = 7994.0;
 const vec3 BETAR = vec3(3.8e-6, 13.5e-6, 33.1e-6);
 
-// Mie Scattering
-const float MIESCALEHEIGHT = 1200.0; // 1200.0
+const float MIESCALEHEIGHT = 1200.0;
 const vec3 BETAM = vec3(210e-5, 210e-5, 210e-5);
-
 
 vec3 Get_camera_rd(vec2 uv, vec3 ro, vec3 ta, float zoom) 
 {
@@ -65,7 +64,7 @@ float Fbm(vec2 uv){
     for(int i = 0 ; i < 3 ; i++)
     {
         fbm += Value_noise(uv) * amp;
-        uv *= 3.0; // freq 
+        uv *= 3.0; 
         amp *= 0.5;
     }
     return fbm / 2.0; 
@@ -98,6 +97,7 @@ float Get_waves(vec2 p)
     }
     return wave; 
 }
+
 vec3 Op_lim_rep( vec3 p, float s, vec3 l)
 {
     vec3 q = p - s*clamp(round(p/s),-l,l);
@@ -112,8 +112,7 @@ float Sd_round_box( vec3 p, vec3 b, float r )
 
 float Map(vec3 p) 
 {
-    //float wave = Get_waves(p.xz);
-    float wave = 0.0;
+    float wave = Get_waves(p.xz);
     float plane = p.y + 3.0 - wave;
 
     vec3 q = Op_lim_rep(p, 2.0, vec3(0.0,0.0, 1.0)); 
@@ -137,7 +136,7 @@ float Render(vec3 r_o, vec3 r_d)
 {
     float t = 0.0;
 
-    for(int i = 0 ; i < MAX_DIST ; i++)
+    for(int i = 0 ; i < MAX_STEPS ; i++)
     {
         vec3 pos = r_o + r_d * t;
         float d = Map(pos);
@@ -151,7 +150,7 @@ float Get_shadow(vec3 pos, vec3 light_pos)
 {
     vec3 light_dir = normalize(light_pos - pos);
     float t = 0.02;
-    for(int i = 0 ; i < 12.0 ; i++)
+    for(int i = 0 ; i < 12 ; i++)
     {
         vec3 p = pos + light_dir * t; 
         float d = Map(p);
@@ -179,7 +178,6 @@ float Get_light(vec3 pos, vec3 cam_pos, vec3 light_pos)
 
 float Ray_sph_intersection(vec3 r_o, vec3 r_d, vec3 sph_pos, float sph_r) 
 {
-    
     float a = dot(r_d, r_d);
     vec3 d = r_o - sph_pos;
     float b = 2.0 * dot(r_d, d);
@@ -191,20 +189,14 @@ float Ray_sph_intersection(vec3 r_o, vec3 r_d, vec3 sph_pos, float sph_r)
     return (-b + sqrt((b*b) - 4.0*a*c))/(2.0*a);
 }
 
-// Returns the expected amount of atmospheric scattering at a given height above sea level
-// Different parameters are passed in for rayleigh and mie scattering
 vec3 scatteringAtHeight(vec3 scatteringAtSea, float height, float heightScale) {
-	return scatteringAtSea * exp(-height/heightScale);
+    return scatteringAtSea * exp(-height/heightScale);
 }
 
-// Returns the height of a vector above the 'earth'
 float height(vec3 p) {
     return (length(p) - EARTH_RAD);
 }
 
-// Calculates the transmittance from pb to pa, given the scale height and the scattering
-// coefficients. The samples parameter controls how accurate the result is.
-// See the scratchapixel link for details on what is happening
 vec3 transmittance(vec3 pa, vec3 pb, int samples, float scaleHeight, vec3 scatCoeffs) {
     float opticalDepth = 0.0;
     float segmentLength = length(pb - pa)/float(samples);
@@ -243,18 +235,15 @@ vec3 Get_atmosphere(vec3 r_o, vec3 atm_intersect_p, vec3 sun_dir)
 
     for (int i = 0; i < samples; i++) 
     {
-        
-    	vec3 sample_point = mix(r_o, atm_intersect_p, (float(i)+0.5)/float(samples));
+        vec3 sample_point = mix(r_o, atm_intersect_p, (float(i)+0.5)/float(samples));
         float sample_height = height(sample_point);
         float dist_to_atm = Ray_sph_intersection(sample_point, sun_dir, vec3(0.0), ATMOS_RAD);
-    	vec3 atm_instersect = sample_point + sun_dir * dist_to_atm;
+        vec3 atm_instersect = sample_point + sun_dir * dist_to_atm;
         
-        // Rayleigh Calculations
         vec3 trans1R = transmittance(r_o, sample_point, 10, RAYLEIGHSCALEHEIGHT, BETAR);
         vec3 trans2R = transmittance(sample_point, atm_instersect, 10, RAYLEIGHSCALEHEIGHT, BETAR);
         sum_raye += trans1R * trans2R * scatteringAtHeight(BETAR, sample_height, RAYLEIGHSCALEHEIGHT) * seg_length;
         
-        // Mie Calculations
         vec3 trans1M = transmittance(r_o, sample_point, 10, MIESCALEHEIGHT, BETAM);
         vec3 trans2M = transmittance(sample_point, atm_instersect, 10, MIESCALEHEIGHT, BETAM);
         sum_mie += trans1M * trans2M * scatteringAtHeight(BETAM, sample_height, MIESCALEHEIGHT) * seg_length;
@@ -268,14 +257,23 @@ vec3 Get_atmosphere(vec3 r_o, vec3 atm_intersect_p, vec3 sun_dir)
 
 vec3 Get_sky_color(vec3 r_o, vec3 r_d, vec3 sun_dir)
 {
-    float dist_atm = Ray_sph_intersection(r_o, r_d, vec3(0.0), ATMOS_RAD); 
-    vec3  atm_intersect_p = r_o + r_d * dist_atm;  
+    vec3 sky_ro = r_o + vec3(0.0, EARTH_RAD, 0.0);
+    float dist_atm = Ray_sph_intersection(sky_ro, r_d, vec3(0.0), ATMOS_RAD); 
+    vec3 atm_intersect_p = sky_ro + r_d * dist_atm;  
     
-    vec3 atm = Get_atmosphere(r_o, atm_intersect_p, sun_dir);
+    vec3 atm = Get_atmosphere(sky_ro, atm_intersect_p, sun_dir);
 
     return atm;
 }
-
+// ACES Tonemapping curve
+vec3 ACESFilm(vec3 x) {
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
 
 void main() {
     vec2 frag_coord = gl_FragCoord.xy;
@@ -291,8 +289,10 @@ void main() {
 
     vec3 color = vec3(0.0);
     
-    vec3 light_pos = vec3(0.0, 1000.0, 200.0);
-    if(d < 100.00)
+    vec3 light_pos = vec3(10 + sin(0.2 * u_time),10 + cos(0.2 * u_time), 1.0);
+    vec3 sun_dir = normalize(light_pos);
+    
+    if(d < 100.0)
     {
         float light = Get_light(p, r_o, light_pos);
         float shadow = Get_shadow(p, light_pos); 
@@ -300,9 +300,10 @@ void main() {
     }
     else
     {
-        color = vec3(0.0, 0.381, 1.0) + Get_sky_color(r_o, r_d, light_pos);
+        color = Get_sky_color(r_o, r_d, sun_dir);
     }
 
+    color = ACESFilm(color);
     color = pow( color, vec3(1.0/2.2));
     fragColor = vec4(color, 1.0);
 }
