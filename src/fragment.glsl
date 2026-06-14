@@ -1,5 +1,5 @@
 #version 330
-
+//https://www.shadertoy.com/view/wsfGWH
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform vec3 ray_origin;
@@ -99,8 +99,8 @@ float Sd_round_box( vec3 p, vec3 b, float r )
 
 float Map(vec3 p) 
 {
-    float wave = Get_waves(p.xz);
-    //float wave = 0.0;
+    //float wave = Get_waves(p.xz);
+    float wave = 0.0;
     float plane = p.y + 3.0 - wave;
 
     vec3 q = Op_lim_rep(p, 2.0, vec3(0.0,0.0, 1.0)); 
@@ -164,6 +164,22 @@ float Get_light(vec3 pos, vec3 cam_pos, vec3 light_pos)
     return light;
 }
 
+vec2 Ray_sph_intersect()
+{
+    vec3 oc = ro - ce;
+    float b = dot( oc, rd );
+    float c = dot( oc, oc ) - ra*ra;
+    float h = b*b - c;
+    if( h<0.0 ) return vec2(-1.0); // no intersection
+    h = sqrt( h );
+    return vec2( -b-h, -b+h );
+}
+
+float Get_atmosphere(vec3 p, vec3 cam_pos)
+{
+    return 0.0;
+}
+
 
 void main() {
     vec2 frag_coord = gl_FragCoord.xy;
@@ -179,7 +195,7 @@ void main() {
 
     vec3 color = vec3(0.0);
     
-    if(d < 100.0)
+    if(d < 100.00)
     {
         vec3 light_pos = vec3(0.0, 10.0, 20.0);
         float light = Get_light(p, r_o, light_pos);
@@ -188,7 +204,8 @@ void main() {
     }
     else
     {
-            
+        p = normalize(p);
+        color = vec3(0.0, 0.843, 1.0) - (0.4 *p.y);
     }
 
     color = pow( color, vec3(1.0/2.2));
