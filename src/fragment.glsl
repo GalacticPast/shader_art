@@ -64,7 +64,7 @@ float Get_waves(vec2 p)
     float wave = 0.0; 
     float weight = 1.0;
     float speed = 2.0;
-    float amp = 1.0;
+    float amp = 0.4;
     float freq = 1.0;
     float t = 0.0; 
 
@@ -77,7 +77,7 @@ float Get_waves(vec2 p)
         wave += w * weight; 
         p += dir * -dx * weight * 0.3;
         speed *= 1.08;
-        amp *= 0.58;
+        amp *= 0.68;
         freq *= 1.34;
         weight *= 0.9;
         t += 12131.198;
@@ -85,14 +85,30 @@ float Get_waves(vec2 p)
     }
     return wave; 
 }
+vec3 Op_lim_rep( vec3 p, float s, vec3 l)
+{
+    vec3 q = p - s*clamp(round(p/s),-l,l);
+    return q;
+}
+
+float Sd_round_box( vec3 p, vec3 b, float r )
+{
+  vec3 q = abs(p) - b + r;
+  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
+}
 
 float Map(vec3 p) 
 {
     float wave = Get_waves(p.xz);
-    float plane = p.y - wave;
-    float d = plane;
-    
-    return d * 0.6;
+    //float wave = 0.0;
+    float plane = p.y + 3.0 - wave;
+
+    vec3 q = Op_lim_rep(p, 2.0, vec3(0.0,0.0, 1.0)); 
+    float box = Sd_round_box(q, vec3(1.5, 0.1, 1.0), 0.1);
+
+    float d = min(plane, box);
+
+    return d;
 }
 
 vec3 Get_normal(vec3 p) 
@@ -141,9 +157,9 @@ float Get_light(vec3 pos, vec3 cam_pos, vec3 light_pos)
     vec3 cam_dir = normalize(cam_pos - pos); 
     vec3 H = normalize(light_dir + cam_dir);
 
-    float diffuse = max(dot(light_dir, N), 0.0) * 2;
-    float spec = pow(max(dot(N, H), 0.0),128.0); 
-    float light = diffuse + spec * 12;
+    float diffuse = max(dot(light_dir, N), 0.0);
+    float spec = pow(max(dot(N, H), 0.0),256.0); 
+    float light = diffuse + spec * 23.0;
 
     return light;
 }
@@ -165,12 +181,16 @@ void main() {
     
     if(d < 100.0)
     {
-        //vec3 light_pos = vec3(1.0 + 10 * sin(u_time), 10.0, 1.0 + 10 * cos(u_time));
-        vec3 light_pos = vec3(0.0, 50.0, 0.0);
+        vec3 light_pos = vec3(0.0, 10.0, 20.0);
         float light = Get_light(p, r_o, light_pos);
-        //float shadow = Get_shadow(p, light_pos); 
-        color = light * vec3(0.0, 0.412, 0.580);
+        float shadow = Get_shadow(p, light_pos); 
+        color = shadow * light * vec3(0.0, 0.2, 0.3);
+    }
+    else
+    {
+            
     }
 
+    color = pow( color, vec3(1.0/2.2));
     fragColor = vec4(color, 1.0);
 }
