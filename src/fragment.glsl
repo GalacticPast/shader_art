@@ -171,7 +171,7 @@ float Get_light(vec3 pos, vec3 cam_pos, vec3 light_pos)
 
     float diffuse = max(dot(light_dir, N), 0.0);
     float spec = pow(max(dot(N, H), 0.0),256.0); 
-    float light = diffuse + spec * 23.0;
+    float light = diffuse + spec * 20.0;
 
     return light;
 }
@@ -289,7 +289,7 @@ void main() {
 
     vec3 color = vec3(0.0);
     
-    vec3 light_pos = vec3(10 + sin(0.2 * u_time),10 + cos(0.2 * u_time), 1.0);
+    vec3 light_pos = vec3(0.0, 1.0, 1.0);
     vec3 sun_dir = normalize(light_pos);
     
     if(d < 100.0)
