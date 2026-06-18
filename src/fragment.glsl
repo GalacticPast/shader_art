@@ -171,7 +171,7 @@ float Get_light(vec3 pos, vec3 cam_pos, vec3 light_pos)
 
     float diffuse = max(dot(light_dir, N), 0.0);
     float spec = pow(max(dot(N, H), 0.0),256.0); 
-    float light = diffuse + spec * 20.0;
+    float light = diffuse + spec;
 
     return light;
 }
@@ -284,19 +284,35 @@ void main() {
     vec3 r_o = ray_origin;     
     vec3 r_d = Get_camera_rd(uv, r_o, look_at_dir, 1.0);
     
-    float d = Render(r_o, r_d);
+float d = Render(r_o, r_d);
     vec3 p = r_o + r_d * d; 
 
     vec3 color = vec3(0.0);
     
-    vec3 light_pos = vec3(0.0, 1.0, 1.0);
+    vec3 light_pos = vec3(0.0, 10000.0, 10000.0);
     vec3 sun_dir = normalize(light_pos);
     
     if(d < 100.0)
     {
+        float WATER_DEPTH = 10.0; 
+
+        vec3 N = Get_normal(p);
+        N = mix(N, vec3(0.0, 1.0, 0.0), 0.8 * min(1.0, sqrt(d * 0.01) * 1.1));
+
+        float fresnel = 0.04 + (1.0 - 0.04) * pow(1.0 - max(0.0, dot(-N, r_d)), 5.0);
+
+        vec3 R = normalize(reflect(r_d, N));
+        R.y = abs(R.y); 
+        
+        vec3 reflection = Get_sky_color(p, R, sun_dir);
+
         float light = Get_light(p, r_o, light_pos);
         float shadow = Get_shadow(p, light_pos); 
-        color = shadow * light * vec3(0.0, 0.2, 0.3);
+
+        vec3 scattering = vec3(0.0293, 0.0698, 0.1717) * 0.1 * (0.2 + (p.y + WATER_DEPTH) / WATER_DEPTH);
+        vec3 lit_scattering = scattering * light * shadow;
+
+        color = fresnel * reflection + lit_scattering;
     }
     else
     {
