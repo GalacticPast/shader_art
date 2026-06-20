@@ -16,40 +16,47 @@ float Sd_sphere(vec3 p, vec3 sph_pos, float rad)
     return length(p - sph_pos) - rad;
 }
 
-
-float Get_waves(vec3 p)
+float Get_waves(vec2 p)
 {
-    vec2 dir = vec2(0.0, 1.0);
-    float freq = 1.0;
-    float amp = 1.0;
-    float speed = 1.0;
-    float weight = 1.0; 
+    vec2 dir = vec2(1.0, 0.0);
 
-    float sum_wave = 0.0;
-    float iter = 8921.3475;
+    float sum_wave   = 0.0;
+    float sum_weight = 0.0;
+
+    float freq   = 1.0;
+    float weight = 1.0;
+    float speed  = 2.0;
+    float t      = 0.0;
 
     for(int i = 0 ; i < 12 ; i++)
     {
-        vec2 pos = vec2(p.x, p.z);
-        float x = freq * dot(pos, dir) + speed * u_time;
-        sum_wave += weight * exp(amp * sin(x) - 1.0); 
-        freq *= 1.3;
-        amp *= 0.3;
-        speed *= 2.0;
-        weight *= 0.9;
-        dir = vec2(sin(iter), cos(iter));
-        iter += 9234.57324;
+        dir = vec2(sin(t), cos(t));
+
+        float x    = freq * dot(p, dir) + u_time * speed;
+        float wave = exp(sin(x) - 1.0);
+        float dx = wave * cos(x);
+
+        p += dir * -dx * weight * 0.3; 
+        
+        sum_wave  += wave * weight;
+        sum_weight += weight;
+
+        weight = mix(weight, 0.0, 0.2);
+        freq   *= 1.18;
+        speed  *= 1.07;
+        t      += 1232.39999;    
     }
 
-    return sum_wave; 
+    return sum_wave / sum_weight;
 }
 
 float Map(vec3 p)
 {
-    float wave = Get_waves(p);
-    float plane = p.y - wave + 3.0;
-
+    float wave = Get_waves(p.xz);
+    float plane = p.y - wave * 2.0;
+    float sph = Sd_sphere(p, vec3(0.0),1.0);
     float d = plane;
+    d = min(d, sph);
     return d;
 }
 
@@ -111,12 +118,15 @@ float Get_shadow(vec3 p, vec3 light_pos)
 float Get_light(vec3 p, vec3 cam_pos, vec3 light_pos)
 {
     vec3 light_dir = normalize(light_pos - p); 
+    vec3 view_dir = normalize(cam_pos - p);
 
     vec3 n = Get_normal(p);
-    vec3 h = normalize(cam_pos + light_pos);  
-
-    float light = dot(n, h);
-
+    vec3 h = normalize(view_dir + light_dir);  
+     
+    float diffuse = max(dot(light_dir, n),0.0);
+    float spec = pow(max(dot(n, h), 0.0), 128);
+    
+    float light = diffuse + spec * 0.2;
     return light; 
 }
 
@@ -132,21 +142,25 @@ void main()
     float t = Render(r_o, r_d);
     vec3 p = r_o + r_d * t;
     
-    vec3 light_pos = vec3(10.0, 100.0, 10.0);
+    vec3 light_pos = vec3(0.0, 100.0, 100.0);
     float light = Get_light(p, r_o, light_pos);
     
+    vec3 fog_color = vec3(0.5, 0.6, 0.7); 
+    float fog_density = 0.01;             
+
     vec3 color = vec3(0.0);
+
     if(t < MAX_DIST)
     {
-        color = light * vec3(0.0, 0.032, 1.0);
+        color = light * vec3(1.0);
+
+        float fogFactor = exp(-fog_density * t);
+
+        color = mix(fog_color, color, fogFactor);
     }
     else
     {
-        vec3 white = vec3(1.0, 1.0, 1.0);
-        vec3 sky_blue = vec3(0.4, 0.7, 1.0); 
-        float sky_blend = clamp(r_d.y, 0.0, 1.0);
-        color = mix(white, sky_blue, sky_blend);
-    }
-    
+        color = fog_color;
+    } 
     fragColor = vec4(color, 1.0);
 }
