@@ -19,32 +19,33 @@ float Sd_sphere(vec3 p, vec3 sph_pos, float rad)
 float Get_waves(vec2 p)
 {
     vec2 dir = vec2(1.0, 0.0);
-
-    float sum_wave   = 0.0;
-    float sum_weight = 0.0;
-
-    float freq   = 1.0;
+    float freq = 1.0;
+    float speed = 2.0;
     float weight = 1.0;
-    float speed  = 2.0;
-    float t      = 0.0;
+
+    float sum_wave  = 0.0;
+    float sum_weight = 0.0;
+    
+    float t = 0.0;
 
     for(int i = 0 ; i < 12 ; i++)
     {
-        dir = vec2(sin(t), cos(t));
 
-        float x    = freq * dot(p, dir) + u_time * speed;
+        float x = freq * dot(p, dir) + speed * u_time;
         float wave = exp(sin(x) - 1.0);
-        float dx = wave * cos(x);
-
-        p += dir * -dx * weight * 0.3; 
+        float dx = wave * cos(x); 
         
-        sum_wave  += wave * weight;
+        p += -dx * dir * weight * 0.3;
+
+        sum_wave += wave * weight;
         sum_weight += weight;
 
+        freq *= 1.12;
+        speed *= 1.04; 
         weight = mix(weight, 0.0, 0.2);
-        freq   *= 1.18;
-        speed  *= 1.07;
-        t      += 1232.39999;    
+
+        t += 781.892;
+        dir = vec2(sin(t), cos(t));
     }
 
     return sum_wave / sum_weight;
@@ -80,12 +81,6 @@ float Render(vec3 r_o, vec3 r_d)
         float d = Map(p);
         t += d;
         if(d < MIN_DIST || t > MAX_DIST)break;
-    }
-    float step = MIN_DIST;
-    for (int i = 0; i < 8; i++) {
-        step *= 0.5;
-        float d = Map(r_o + r_d * t);
-        t += (d > 0.0) ? step : -step;
     }
     return t;
 }
@@ -154,9 +149,9 @@ void main()
     {
         color = light * vec3(1.0);
 
-        float fogFactor = exp(-fog_density * t);
+        float fog_factor = exp(-fog_density * t);
 
-        color = mix(fog_color, color, fogFactor);
+        color = mix(fog_color, color, fog_factor);
     }
     else
     {
