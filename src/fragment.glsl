@@ -28,7 +28,7 @@ float Get_waves(vec2 p)
     
     float t = 0.0;
 
-    for(int i = 0 ; i < 12 ; i++)
+    for(int i = 0 ; i < 32 ; i++)
     {
 
         float x = freq * dot(p, dir) + speed * u_time;
@@ -55,7 +55,7 @@ float Map(vec3 p)
 {
     float wave = Get_waves(p.xz);
     float plane = p.y - wave * 2.0;
-    float sph = Sd_sphere(p, vec3(0.0),1.0);
+    float sph = Sd_sphere(p, vec3(0.0, 2.0, 0.0),1.0);
     float d = plane;
     d = min(d, sph);
     return d;
@@ -121,8 +121,43 @@ float Get_light(vec3 p, vec3 cam_pos, vec3 light_pos)
     float diffuse = max(dot(light_dir, n),0.0);
     float spec = pow(max(dot(n, h), 0.0), 128);
     
-    float light = diffuse + spec * 0.2;
+    float light = diffuse + spec;
     return light; 
+}
+
+float Ray_sph_intersect(vec3 p, vec3 dir, vec3 sph_pos, float sph_rad)
+{
+    vec3 p_s = sph_pos - p;
+
+    float ang = dot(p_s, dir);
+
+    float len_sq = dot(p_s, p_s);
+    float H_sq = len_sq - (ang * ang); 
+    if (H_sq > (sph_rad * sph_rad)) return 0.0;
+    
+    float p_len = sqrt((sph_rad * sph_rad) - H_sq); 
+    float t_0 = ang - p_len;
+    float t_1 = ang + p_len;
+
+    if (t_0 > 0.0) return t_0;
+    if (t_1 > 0.0) return t_1;
+
+    return 0.0;
+}
+
+vec3 Get_atp(vec3 p, vec3 dir, vec3 sun_dir)
+{
+    //sundir.y = max(sundir.y, -0.07);
+    float special_trick = 1.0 / (dir.y * 1.0 + 0.1);
+    float special_trick2 = 1.0 / (sun_dir.y * 11.0 + 1.0);
+    float raysundt = pow(abs(dot(sun_dir, dir)), 2.0);
+    float sundt = pow(max(0.0, dot(sun_dir, dir)), 8.0);
+    float mymie = sundt * special_trick * 0.2;
+    vec3 suncolor = mix(vec3(1.0), max(vec3(0.0), vec3(1.0) - vec3(5.5, 13.0, 22.4) / 22.4), special_trick2);
+    vec3 bluesky= vec3(5.5, 13.0, 22.4) / 22.4 * suncolor;
+    vec3 bluesky2 = max(vec3(0.0), bluesky - vec3(5.5, 13.0, 22.4) * 0.002 * (special_trick + -6.0 * sun_dir.y * sun_dir.y));
+    bluesky2 *= special_trick * (0.24 + raysundt * 0.24);
+    return bluesky2 * (1.0 + 1.0 * pow(1.0 - dir.y, 3.0)); 
 }
 
 void main()
@@ -144,18 +179,23 @@ void main()
     float fog_density = 0.01;             
 
     vec3 color = vec3(0.0);
-
     if(t < MAX_DIST)
     {
-        color = light * vec3(1.0);
+        vec3 N = Get_normal(p);
+        N = mix(N, vec3(0.0, 1.0, 0.0), 0.8 * min(1.0, sqrt(t * 0.01) * 1.1));
 
+        vec3 R = normalize(reflect(r_d, N));
+        R.y = abs(R.y); 
+        vec3 reflection = Get_atp(p, R, light_pos);
+
+        color = light * fog_color;
         float fog_factor = exp(-fog_density * t);
 
         color = mix(fog_color, color, fog_factor);
     }
     else
     {
-        color = fog_color;
+        color = Get_atp(p, r_d, normalize(light_pos)) * 0.5;
     } 
     fragColor = vec4(color, 1.0);
 }
