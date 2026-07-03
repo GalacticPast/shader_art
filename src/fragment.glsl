@@ -15,6 +15,8 @@ const float ETH_RAD = 6360e3;
 const float HEIGHT_RAY = 7994.0;
 const float HEIGHT_MIE = 1200.0;
 
+const float WATER_DEPTH = 1.0;
+
 // Removed the 'f' suffix for standard GLSL compatibility
 const vec3 BETA_RAY = vec3(3.8e-6, 13.5e-6, 33.1e-6);
 const vec3 BETA_MIE = vec3(21e-6);
@@ -215,10 +217,27 @@ float Get_light(vec3 p, vec3 cam_pos, vec3 light_pos)
     float diffuse = max(dot(light_dir, n),0.0);
     float spec = pow(max(dot(n, h), 0.0), 128);
     
-    float light = diffuse + spec;
+    float light = diffuse + spec * 20.0;
     return light; 
 }
 
+vec3 aces_tonemap(vec3 color) 
+{  
+  mat3 m1 = mat3(
+    0.59719, 0.07600, 0.02840,
+    0.35458, 0.90834, 0.13383,
+    0.04823, 0.01566, 0.83777
+  );
+  mat3 m2 = mat3(
+    1.60475, -0.10208, -0.00327,
+    -0.53108,  1.10813, -0.07276,
+    -0.07367, -0.00605,  1.07602
+  );
+  vec3 v = m1 * color;  
+  vec3 a = v * (v + 0.0245786) - 0.000090537;
+  vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+  return pow(clamp(m2 * (a / b), 0.0, 1.0), vec3(1.0 / 2.2));  
+}
 void main()
 {
     vec2 uv = gl_FragCoord.xy * 2.0 / u_resolution.xy;
@@ -229,28 +248,38 @@ void main()
     vec3 r_d = Get_camera_rd(uv, r_o, look_at_dir, 1.0); 
     
     float t = Render(r_o, r_d);
-    vec3 p = r_o + r_d * t;
     
     vec3 sun_pos = vec3(0.0, 100.0, 100.0);
-    float light = Get_light(p, r_o, sun_pos);
+    vec3 sun_dir = normalize(sun_pos);
     
     vec3 fog_color = vec3(0.5, 0.6, 0.7);             
-
     vec3 color = vec3(0.0);
+    
     if(t < MAX_DIST)
     {
-        color = light * fog_color;
+        vec3 p = r_o + r_d * t;
+        vec3 planet_surface_origin = vec3(0.0, ETH_RAD + p.y, 0.0);
+        
+        vec3 N = Get_normal(p);
+        N = mix(N, vec3(0.0, 1.0, 0.0), 0.8 * min(1.0, sqrt(t*0.01) * 1.1));
+        
+        float light = Get_light(p, r_o, sun_pos);
+        
+        float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-N, r_d)), 5.0)));
+        vec3 R = normalize(reflect(r_d, N));
+        R.y = abs(R.y);
+        vec3 reflection = Get_atmosphere(planet_surface_origin, R, sun_dir);
+        
+        vec3 scattering = vec3(0.0293, 0.0698, 0.1717) * 0.1 * (0.2 + (p.y + WATER_DEPTH) / WATER_DEPTH);
+        
+        vec3 C = fresnel * reflection + scattering;
+        color = C * light * fog_color;
+        color = aces_tonemap(color * 2.0); 
     }
     else
     {
-        vec3 planet_surface_origin = vec3(0.0, ETH_RAD, 0.0);
-        
-        vec3 sun_dir = normalize(sun_pos); 
-        
-        color = Get_atmosphere(planet_surface_origin, r_d, sun_dir);
-        
-        color = 1.0 - exp(-color * 1.5); 
+        color = Get_atmosphere(vec3(0.0, ETH_RAD + r_o.y, 0.0), r_d, sun_dir);
     } 
-    
+
     fragColor = vec4(color, 1.0);
 }
