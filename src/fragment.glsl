@@ -6,10 +6,18 @@ uniform vec3 ray_origin;
 uniform vec3 look_at_dir;
 
 out vec4 fragColor;
-
+const float PI = 3.1415929;
 const float MAX_DIST = 100.0;
 const float MIN_DIST = 0.0001;
 
+const float ATM_RAD = 6420e3;
+const float ETH_RAD = 6360e3;
+const float HEIGHT_RAY = 7994.0;
+const float HEIGHT_MIE = 1200.0;
+
+// Removed the 'f' suffix for standard GLSL compatibility
+const vec3 BETA_RAY = vec3(3.8e-6, 13.5e-6, 33.1e-6);
+const vec3 BETA_MIE = vec3(21e-6);
 
 float Sd_sphere(vec3 p, vec3 sph_pos, float rad)
 {
@@ -30,7 +38,6 @@ float Get_waves(vec2 p)
 
     for(int i = 0 ; i < 32 ; i++)
     {
-
         float x = freq * dot(p, dir) + speed * u_time;
         float wave = exp(sin(x) - 1.0);
         float dx = wave * cos(x); 
@@ -55,9 +62,7 @@ float Map(vec3 p)
 {
     float wave = Get_waves(p.xz);
     float plane = p.y - wave * 2.0;
-    float sph = Sd_sphere(p, vec3(0.0, 2.0, 0.0),1.0);
     float d = plane;
-    d = min(d, sph);
     return d;
 }
 
@@ -70,6 +75,26 @@ vec3 Get_normal(vec3 p)
     float dz = Map(p + e.yyx) - Map(p - e.yyx);
     
     return normalize(vec3(dx, dy, dz));
+}
+
+float Ray_sph_intersect(vec3 p, vec3 dir, vec3 sph_pos, float sph_rad)
+{
+    vec3 p_s = sph_pos - p;
+
+    float ang = dot(p_s, dir);
+
+    float len_sq = dot(p_s, p_s);
+    float H_sq = len_sq - (ang * ang); 
+    if (H_sq > (sph_rad * sph_rad)) return 0.0;
+    
+    float p_len = sqrt((sph_rad * sph_rad) - H_sq); 
+    float t_0 = ang - p_len;
+    float t_1 = ang + p_len;
+
+    if (t_0 > 0.0) return t_0;
+    if (t_1 > 0.0) return t_1;
+
+    return 0.0;
 }
 
 float Render(vec3 r_o, vec3 r_d)
@@ -110,6 +135,75 @@ float Get_shadow(vec3 p, vec3 light_pos)
     return 1.0;
 }
 
+vec3 Get_atmosphere(vec3 p, vec3 dir, vec3 sun_dir)
+{
+    float atm_intersect = Ray_sph_intersect(p, dir, vec3(0.0), ATM_RAD); 
+    
+     
+    float ray_samples = 12.0;
+    float light_samples = 8.0;
+    
+    float seg_length = atm_intersect / ray_samples; 
+    
+    vec3 sum_mie = vec3(0.0);
+    vec3 sum_ray = vec3(0.0);
+    
+    float optical_depth_ray = 0.0;
+    float optical_depth_mie = 0.0;
+    
+    float g = 0.76;
+    float mu = dot(dir, sun_dir);
+    
+    float phase_ray = 3.0 / (16.0 * PI) * (1.0 + mu * mu); 
+    float phase_mie = 3.0 / (8.0 * PI) * ((1.0 - g * g) * (1.0 + mu * mu)) / ((2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
+    
+    float curr_sample_dist = 0.0;
+    
+    for(int i = 0; i < int(ray_samples); i++)
+    {
+        vec3 sam_p = p + dir * (curr_sample_dist + seg_length * 0.5);
+        float height = length(sam_p) - ETH_RAD; 
+
+        float opd_ray = exp(-height / HEIGHT_RAY) * seg_length; 
+        float opd_mie = exp(-height / HEIGHT_MIE) * seg_length;
+
+        optical_depth_ray += opd_ray;
+        optical_depth_mie += opd_mie;
+
+        float light_intersect_dist = Ray_sph_intersect(sam_p, sun_dir, vec3(0.0), ATM_RAD);
+        float light_seg_length = light_intersect_dist / light_samples;
+
+        float optical_light_depth_ray = 0.0;
+        float optical_light_depth_mie = 0.0;
+        float current_light_dist = 0.0; 
+
+        for(int j = 0; j < int(light_samples); j++)
+        {
+            vec3 light_sam_p = sam_p + sun_dir * (current_light_dist + light_seg_length * 0.5);
+
+            float height_light = length(light_sam_p) - ETH_RAD;
+            if(height_light < 0.0) break; // Terminate if in Earth's shadow
+
+            optical_light_depth_ray  += exp(-height_light / HEIGHT_RAY) * light_seg_length; 
+            optical_light_depth_mie += exp(-height_light / HEIGHT_MIE) * light_seg_length; 
+
+            current_light_dist += light_seg_length;
+        }
+
+        vec3 tau = BETA_RAY * (optical_depth_ray + optical_light_depth_ray) + 
+                   BETA_MIE * 1.1 * (optical_depth_mie + optical_light_depth_mie);
+                   
+        vec3 attenuation = exp(-tau);
+        
+        sum_ray += attenuation * opd_ray;
+        sum_mie += attenuation * opd_mie;
+
+        curr_sample_dist += seg_length;
+    }
+
+    return (sum_ray * BETA_RAY * phase_ray + sum_mie * BETA_MIE * phase_mie) * 20.0; 
+}
+
 float Get_light(vec3 p, vec3 cam_pos, vec3 light_pos)
 {
     vec3 light_dir = normalize(light_pos - p); 
@@ -125,44 +219,9 @@ float Get_light(vec3 p, vec3 cam_pos, vec3 light_pos)
     return light; 
 }
 
-float Ray_sph_intersect(vec3 p, vec3 dir, vec3 sph_pos, float sph_rad)
-{
-    vec3 p_s = sph_pos - p;
-
-    float ang = dot(p_s, dir);
-
-    float len_sq = dot(p_s, p_s);
-    float H_sq = len_sq - (ang * ang); 
-    if (H_sq > (sph_rad * sph_rad)) return 0.0;
-    
-    float p_len = sqrt((sph_rad * sph_rad) - H_sq); 
-    float t_0 = ang - p_len;
-    float t_1 = ang + p_len;
-
-    if (t_0 > 0.0) return t_0;
-    if (t_1 > 0.0) return t_1;
-
-    return 0.0;
-}
-
-vec3 Get_atp(vec3 p, vec3 dir, vec3 sun_dir)
-{
-    //sundir.y = max(sundir.y, -0.07);
-    float special_trick = 1.0 / (dir.y * 1.0 + 0.1);
-    float special_trick2 = 1.0 / (sun_dir.y * 11.0 + 1.0);
-    float raysundt = pow(abs(dot(sun_dir, dir)), 2.0);
-    float sundt = pow(max(0.0, dot(sun_dir, dir)), 8.0);
-    float mymie = sundt * special_trick * 0.2;
-    vec3 suncolor = mix(vec3(1.0), max(vec3(0.0), vec3(1.0) - vec3(5.5, 13.0, 22.4) / 22.4), special_trick2);
-    vec3 bluesky= vec3(5.5, 13.0, 22.4) / 22.4 * suncolor;
-    vec3 bluesky2 = max(vec3(0.0), bluesky - vec3(5.5, 13.0, 22.4) * 0.002 * (special_trick + -6.0 * sun_dir.y * sun_dir.y));
-    bluesky2 *= special_trick * (0.24 + raysundt * 0.24);
-    return bluesky2 * (1.0 + 1.0 * pow(1.0 - dir.y, 3.0)); 
-}
-
 void main()
 {
-    vec2 uv = gl_FragCoord.xy * 2.0/ u_resolution.xy;
+    vec2 uv = gl_FragCoord.xy * 2.0 / u_resolution.xy;
     uv -= 1.0; 
     uv.x *= u_resolution.x / u_resolution.y;
     
@@ -172,30 +231,26 @@ void main()
     float t = Render(r_o, r_d);
     vec3 p = r_o + r_d * t;
     
-    vec3 light_pos = vec3(0.0, 100.0, 100.0);
-    float light = Get_light(p, r_o, light_pos);
+    vec3 sun_pos = vec3(0.0, 100.0, 100.0);
+    float light = Get_light(p, r_o, sun_pos);
     
-    vec3 fog_color = vec3(0.5, 0.6, 0.7); 
-    float fog_density = 0.01;             
+    vec3 fog_color = vec3(0.5, 0.6, 0.7);             
 
     vec3 color = vec3(0.0);
     if(t < MAX_DIST)
     {
-        vec3 N = Get_normal(p);
-        N = mix(N, vec3(0.0, 1.0, 0.0), 0.8 * min(1.0, sqrt(t * 0.01) * 1.1));
-
-        vec3 R = normalize(reflect(r_d, N));
-        R.y = abs(R.y); 
-        vec3 reflection = Get_atp(p, R, light_pos);
-
         color = light * fog_color;
-        float fog_factor = exp(-fog_density * t);
-
-        color = mix(fog_color, color, fog_factor);
     }
     else
     {
-        color = Get_atp(p, r_d, normalize(light_pos)) * 0.5;
+        vec3 planet_surface_origin = vec3(0.0, ETH_RAD, 0.0);
+        
+        vec3 sun_dir = normalize(sun_pos); 
+        
+        color = Get_atmosphere(planet_surface_origin, r_d, sun_dir);
+        
+        color = 1.0 - exp(-color * 1.5); 
     } 
+    
     fragColor = vec4(color, 1.0);
 }
