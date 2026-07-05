@@ -16,7 +16,6 @@ const float HEIGHT_RAY = 7994.0;
 const float HEIGHT_MIE = 1200.0;
 
 
-// Removed the 'f' suffix for standard GLSL compatibility
 const vec3 BETA_RAY = vec3(3.8e-6, 13.5e-6, 33.1e-6);
 const vec3 BETA_MIE = vec3(21e-6);
 
@@ -24,6 +23,14 @@ float Sd_sphere(vec3 p, vec3 sph_pos, float rad)
 {
     return length(p - sph_pos) - rad;
 }
+
+float Sd_ellipsoid( vec3 p, vec3 r )
+{
+  float k0 = length(p/r);
+  float k1 = length(p/(r*r));
+  return k0*(k0-1.0)/k1;
+}
+
 
 float Get_waves(vec2 p)
 {
@@ -59,11 +66,23 @@ float Get_waves(vec2 p)
     return sum_wave / sum_weight;
 }
 
+float Get_us(vec3 p)
+{
+    // girl 
+    float head = Sd_ellipsoid(p - vec3(0.0, 1.0, 0.0), vec3(0.5, 0.8, 0.3));
+    return head;
+}
+
 float Map(vec3 p)
 {
-    float wave = Get_waves(p.xz);
+    //float wave = Get_waves(p.xz);
+    float wave = 0.0;
     float plane = p.y - wave * 2.0;
-    float d = plane;
+
+    float model = Get_us(p);
+
+    float d = min(plane, model);
+    
     return d;
 }
 
@@ -215,8 +234,9 @@ float Get_light(vec3 p, vec3 cam_pos, vec3 light_pos)
      
     float diffuse = max(dot(light_dir, n),0.0);
     float spec = pow(max(dot(n, h), 0.0), 128);
+    float ambient = 0.1; 
     
-    float light = diffuse + spec;
+    float light = diffuse + spec + ambient;
     return light * 0.3; 
 }
 
@@ -231,7 +251,8 @@ void main()
     
     float t = Render(r_o, r_d);
     
-    vec3 sun_pos = vec3(sin(0.02 * u_time), cos(0.02 * u_time), 1.0);
+    //vec3 sun_pos = vec3(sin(0.02 * u_time), cos(0.02 * u_time), 1.0);
+    vec3 sun_pos = vec3(0.3, 1.0, 1.0);
     sun_pos *= 10000.0;
     vec3 sun_dir = normalize(sun_pos);
     
@@ -253,7 +274,7 @@ void main()
     }
     else
     {
-        color = Get_atmosphere(vec3(0.0, ETH_RAD + r_o.y, 0.0), r_d, sun_dir);
+        color = Get_atmosphere(vec3(0.0, ETH_RAD, 0.0), r_d, sun_dir);
     } 
     
     color = pow(color, vec3(1.0/2.2));
